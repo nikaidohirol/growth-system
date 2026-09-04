@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# 数据库 / 上传 / 密钥
+server/*.db
+server/uploads/
+server/.env
+
+# Node
+node_modules/
+web/dist/
+*.local
+web/vite.config.js
+web/vite.config.d.ts
+*.tsbuildinfo
+
+# IDE / 系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

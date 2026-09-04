@@ -1,0 +1,70 @@
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #f5f7fb;
+}
+
+/* ---- 登录页 ---- */
+.login-page {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(135deg, rgba(30, 60, 130, 0.85), rgba(59, 111, 224, 0.75)),
+    url('https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=modern%20university%20campus%20at%20dusk%2C%20blue%20tones%2C%20minimal%20architecture%2C%20soft%20light%2C%20clean%20sky%2C%20wide%20angle&image_size=landscape_16_9') center / cover no-repeat,
+    linear-gradient(135deg, #1e3c82, #3b6fe0);
+}
+.login-card {
+  width: 400px;
+  padding: 40px 36px 28px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+.login-title { text-align: center; font-size: 22px; font-weight: 700; color: #1e3c82; margin-bottom: 4px; }
+.login-sub { text-align: center; color: #8a94a6; margin-bottom: 24px; font-size: 13px; }
+
+/* ---- A4 成长档案 ---- */
+.a4 {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto 24px;
+  padding: 14mm 12mm;
+  background: #fff;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  position: relative;
+  overflow: hidden;
+  color: #222;
+}
+.a4-watermark {
+  position: absolute;
+  inset: 0;
+  background: url('/assets/shuiyin.jpg') center / 70% no-repeat;
+  opacity: 0.08;
+  pointer-events: none;
+}
+.a4 h2 { font-size: 18px; text-align: center; margin: 0 0 12px; letter-spacing: 2px; }
+.a4 h3 { font-size: 14px; border-left: 3px solid #3b6fe0; padding-left: 8px; margin: 14px 0 8px; }
+.a4 table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.a4 th, .a4 td { border: 1px solid #ccc; padding: 4px 6px; text-align: center; }
+.a4 th { background: #eef3fc; }
+.a4 .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 12px; }
+.a4 .info-grid div { padding: 4px 6px; border-bottom: 1px dashed #ddd; }
+
+/* ---- AI 抽屉 ---- */
+.chat-msg { margin-bottom: 14px; display: flex; }
+.chat-msg.user { justify-content: flex-end; }
+.chat-bubble {
+  max-width: 84%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.7;
+  word-break: break-word;
+}
+.chat-msg.user .chat-bubble { background: #3b6fe0; color: #fff; }
+.chat-msg.ai .chat-bubble { background: #f3f5f9; color: #222; }
+.chat-bubble p { margin: 4px 0; }
+.chat-bubble pre { background: #282c34; color: #abb2bf; padding: 8px; border-radius: 6px; overflow: auto; }
