@@ -34,6 +34,7 @@ class EntityDef:
     fields: list[FieldDef] = field(default_factory=list)
     search_fields: list[str] = field(default_factory=list)
     order_by: str = "createdAt"
+    dean_review: bool = False   # True=辅导员仅初审，院长终审（高学分/稀缺/易争议类）；False=辅导员直接终审
 
     @property
     def table_fields(self) -> list[FieldDef]:
@@ -43,9 +44,12 @@ class EntityDef:
         return self.fields
 
     def validate_payload(self, payload: dict) -> dict:
-        """过滤白名单字段 + 必填校验 + kv 学分自动计算"""
+        """过滤白名单字段 + 必填校验（学分一律由服务端按规则矩阵核定，不接收客户端传值）"""
         data, errors = {}, []
         for f in self.fields:
+            if f.type == "kv":
+                # kv 字段值由 apply_kv 从两级选择写入，必选校验在 apply_kv 内完成
+                continue
             v = payload.get(f.name)
             if f.required and (v is None or str(v).strip() == ""):
                 errors.append(f"{f.label}不能为空")
@@ -55,13 +59,6 @@ class EntityDef:
             if f.type == "number":
                 v = float(v)
             data[f.name] = v
-        # kv 类型：根据两级选择自动计算学分
-        kv = payload.get("_credit", None)
-        if kv is not None:
-            try:
-                data["credit"] = float(kv)
-            except (TypeError, ValueError):
-                errors.append("学分计算失败")
         return data, errors
 
 
@@ -103,7 +100,7 @@ ENTITY_REGISTRY: dict[str, EntityDef] = {e.key: e for e in [
         ]),
     EntityDef(
         key="inn_competition", model=Innovation, label="科技创新竞赛", group="inn",
-        search_fields=["project"],
+        search_fields=["project"], dean_review=True,
         fields=[
             FieldDef("project", "竞赛名称", "text", True),
             FieldDef("honor", "获奖情况", "kv", True, kv_category="competition"),
@@ -112,7 +109,7 @@ ENTITY_REGISTRY: dict[str, EntityDef] = {e.key: e for e in [
         ]),
     EntityDef(
         key="inn_enterprise", model=Innovation, label="创业实践", group="inn",
-        search_fields=["project"],
+        search_fields=["project"], dean_review=True,
         fields=[
             FieldDef("project", "创业项目名称", "text", True),
             FieldDef("implementation", "创业类型", "kv", True, kv_category="enterprise"),
@@ -121,7 +118,7 @@ ENTITY_REGISTRY: dict[str, EntityDef] = {e.key: e for e in [
         ]),
     EntityDef(
         key="inn_paper", model=Innovation, label="学术论文", group="inn",
-        search_fields=["project"],
+        search_fields=["project"], dean_review=True,
         fields=[
             FieldDef("project", "论文题目", "text", True),
             FieldDef("implementation", "发表情况", "kv", True, kv_category="paper"),
@@ -129,7 +126,7 @@ ENTITY_REGISTRY: dict[str, EntityDef] = {e.key: e for e in [
         ]),
     EntityDef(
         key="inn_patent", model=Innovation, label="申请专利", group="inn",
-        search_fields=["project"],
+        search_fields=["project"], dean_review=True,
         fields=[
             FieldDef("project", "专利名称", "text", True),
             FieldDef("implementation", "专利类型", "kv", True, kv_category="patent"),
@@ -145,7 +142,7 @@ ENTITY_REGISTRY: dict[str, EntityDef] = {e.key: e for e in [
         ]),
     EntityDef(
         key="honor", model=Honor, label="个人荣誉", group="other",
-        search_fields=["project", "team"],
+        search_fields=["project", "team"], dean_review=True,
         fields=[
             FieldDef("project", "荣誉名称", "text", True),
             FieldDef("level", "级别", "select", True, options="honor_level"),
@@ -190,6 +187,17 @@ INN_CATEGORY = {
 }
 
 
+def category_scope(key: str, model):
+    """Innovation 7 类共用一张表：返回按实体 key 对应 category 的过滤条件（其他实体返回 None）。
+
+    任何按实体 key 遍历注册表做统计/列表的地方都必须套上这个过滤，
+    否则 7 个创新板块会互相串数据、计数放大 7 倍。
+    """
+    if key in INN_CATEGORY:
+        return model.category == INN_CATEGORY[key]
+    return None
+
+
 def registry_payload() -> list[dict]:
     """输出给前端的实体契约（/api/meta/entities）"""
     out = []
@@ -197,6 +205,7 @@ def registry_payload() -> list[dict]:
         search = [x for x in e.fields if x.name in e.search_fields] or e.fields[:1]
         out.append({
             "key": e.key, "label": e.label, "group": e.group,
+            "deanReview": e.dean_review,
             "searchPlaceholder": " / ".join(f.label for f in search),
             "searchFields": [f.name for f in search],
             "fields": [{
