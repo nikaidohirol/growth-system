@@ -8,7 +8,7 @@
 |---|---|
 | 前端 | React 18 · TypeScript · Vite 5 · Ant Design 5 · Zustand · React Router 6 · ECharts · jspdf/html2canvas/xlsx |
 | 后端 | FastAPI · SQLAlchemy 2 (async) · SQLite(aiosqlite) · JWT · LangChain/LangGraph · FAISS |
-| AI | OpenAI 兼容协议多模型切换（DeepSeek/通义/自建）；RAG 知识库向量检索；SSE 流式对话；多轮记忆；TTS |
+| AI | OpenAI 兼容协议多模型切换（DeepSeek/通义/自建）；RAG 知识库向量检索；SSE 流式对话；多轮记忆；TTS；语音识别（讯飞 RTASR，未配置降级浏览器 Web Speech） |
 
 ## 端口规范（重要）
 
