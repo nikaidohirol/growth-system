@@ -1,23 +1,38 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import {
   App, Button, Card, Descriptions, Form, Image, Input, Modal, Popconfirm,
   Select, Space, Spin, Table, Tag, Upload,
 } from 'antd'
 import {
   DeleteOutlined, EditOutlined, InboxOutlined, PlusOutlined, RobotOutlined,
-  SearchOutlined, EyeOutlined,
+  SearchOutlined, EyeOutlined, UploadOutlined,
 } from '@ant-design/icons'
 import { aiAPI, entityAPI, filesAPI } from '@/api/modules'
 import { useMetaStore } from '@/store/meta'
 import { formToPayload, recordToForm, renderFormField } from '@/components/entity/fields'
+import { entityImportColumns } from '@/components/entity/importColumns'
+import ExcelImportModal from '@/components/common/ExcelImportModal'
+import RecordLogs from '@/components/entity/RecordLogs'
 import type { EntityMeta, EntityRecord, FieldMeta } from '@/types'
 
-const STATUS_COLOR: Record<string, string> = { 待审核: 'gold', 通过: 'green', 驳回: 'red' }
+const STATUS_COLOR: Record<string, string> = {
+  待审核: 'gold', 待院长审批: 'orange', 公示中: 'blue', 通过: 'green', 驳回: 'red',
+}
 
 function statusTag(status: string) {
   return <Tag color={STATUS_COLOR[status] ?? 'default'}>{status}</Tag>
+}
+
+/** 学生可操作状态：仅待审核/驳回（待院长审批、公示中、已生效均锁定） */
+const EDITABLE: readonly string[] = ['待审核', '驳回']
+
+/** 当前日期是否在本学期申报窗口内（YYYY-MM-DD 字符串比较） */
+export function inApplyWindow(flow?: { windowStart: string; windowEnd: string }) {
+  if (!flow) return true
+  const today = new Date().toISOString().slice(0, 10)
+  return flow.windowStart <= today && today <= flow.windowEnd
 }
 
 function renderCell(field: FieldMeta, value: unknown) {
@@ -42,6 +57,7 @@ export default function EntityPage() {
   const [loading, setLoading] = useState(false)
 
   const [form] = Form.useForm()
+  const postValue = Form.useWatch('post', form)   // 竞赛类次序系数实时联动核定预览
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<EntityRecord | null>(null)
   const [detail, setDetail] = useState<EntityRecord | null>(null)
@@ -50,6 +66,7 @@ export default function EntityPage() {
   const [fileList, setFileList] = useState<{ label: string; url: string }[]>([])
   const [aiDesc, setAiDesc] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   useEffect(() => {
     if (!loaded) load().catch(() => undefined)
@@ -71,6 +88,17 @@ export default function EntityPage() {
   useEffect(() => {
     if (entity) loadRows()
   }, [entity, page, pageSize]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 通知深链：/entity/{key}?rid=xxx → 直接打开对应记录详情（通知中心点击跳转）
+  const [params, setSearchParams] = useSearchParams()
+  const rid = params.get('rid')
+  useEffect(() => {
+    if (!rid || !entity) return
+    entityAPI.detail(key, rid)
+      .then((r) => setDetail(r))
+      .catch(() => undefined)
+      .finally(() => setSearchParams({}, { replace: true }))
+  }, [rid, entity, key, setSearchParams])
 
   const openCreate = () => {
     setEditing(null)
@@ -185,6 +213,9 @@ export default function EntityPage() {
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
             新增申请
           </Button>
+          <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>
+            批量导入
+          </Button>
         </Space>
       }
     >
@@ -279,7 +310,7 @@ export default function EntityPage() {
                 rules={f.required ? [{ required: true, message: `${f.label}不能为空` }] : []}
                 style={f.half ? undefined : { gridColumn: '1 / -1' }}
               >
-                {renderFormField(f, meta, form, kv, setKv)}
+                {renderFormField(f, meta, form, kv, setKv, postValue)}
               </Form.Item>
             ))}
             <Form.Item label="佐证材料" style={{ gridColumn: '1 / -1' }}>
@@ -331,6 +362,11 @@ export default function EntityPage() {
                 </Descriptions.Item>
               ))}
               <Descriptions.Item label="状态">{statusTag(detail.status)}</Descriptions.Item>
+              {detail.credit !== undefined && detail.credit !== null && (
+                <Descriptions.Item label="核定学分">
+                  <Tag color="orange">系统核定 {String(detail.credit)} 学分</Tag>
+                </Descriptions.Item>
+              )}
               <Descriptions.Item label="审核意见">{detail.opinion || '-'}</Descriptions.Item>
               <Descriptions.Item label="审核人">{detail.auditor || '-'}</Descriptions.Item>
               <Descriptions.Item label="审核时间">{detail.auditTime || '-'}</Descriptions.Item>
@@ -343,9 +379,20 @@ export default function EntityPage() {
                 ))}
               </Space>
             )}
+            <RecordLogs entityKey={key} recordId={detail.id} />
           </>
         )}
       </Modal>
+
+      {/* Excel 批量导入（模板列由实体契约动态生成，kv 认定项拆两级列，服务端核定学分） */}
+      <ExcelImportModal
+        open={importOpen}
+        title={`批量导入${entity.label}`}
+        columns={entityImportColumns(entity, meta)}
+        doImport={(rows) => entityAPI.importEntities(key, { rows })}
+        onDone={() => { setPage(1); loadRows(1, pageSize, '') }}
+        onClose={() => setImportOpen(false)}
+      />
     </Card>
   )
 }
