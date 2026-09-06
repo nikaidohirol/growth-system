@@ -5,8 +5,11 @@ import {
 } from 'antd'
 import {
   DeleteOutlined, EditOutlined, FormOutlined, PlusOutlined, ReloadOutlined,
+  UploadOutlined,
 } from '@ant-design/icons'
 import { userAPI } from '@/api/modules'
+import ExcelImportModal from '@/components/common/ExcelImportModal'
+import type { ImportColumn } from '@/components/common/ExcelImportModal'
 import { useMetaStore } from '@/store/meta'
 import type { GpaRow } from '@/types'
 
@@ -40,7 +43,7 @@ export default function StudentManage() {
 
   const [addOpen, setAddOpen] = useState(false)
   const [batchOpen, setBatchOpen] = useState(false)
-  const [batchText, setBatchText] = useState('')
+  const [gpaImportOpen, setGpaImportOpen] = useState(false)
   const [editing, setEditing] = useState<StudentRow | null>(null)
   const [form] = Form.useForm()
 
@@ -79,28 +82,39 @@ export default function StudentManage() {
       await userAPI.updateStudent(editing.id, rest)
       message.success('修改成功')
     } else {
-      const { created, skipped } = await userAPI.addStudents(values)
-      message.success(created.length ? `新增成功：${created.join('、')}` : '未新增')
-      if (skipped.length) message.warning(`学号已存在：${skipped.join('、')}`)
+      const res = await userAPI.addStudents(values)
+      message.success(res.created ? `新增成功：${values.uid}` : '未新增')
+      if (res.errors?.length) message.warning(res.errors.map((e) => e.message).join('；'))
     }
     setAddOpen(false)
     setEditing(null)
     loadRows()
   }
 
-  const importBatch = async () => {
-    // 批量导入格式：学号,姓名,性别,班级,学院,专业（每行一条，中文或英文逗号均可）
-    const items = batchText.trim().split('\n').filter(Boolean).map((line) => {
-      const [uid, name, sex, classId, college, major] = line.split(/[,，]/).map((s) => s.trim())
-      return { ...emptyStudent, uid, name, sex: sex || '男', classId, college, major, periods: periods || undefined }
-    }).filter((s) => s.uid && s.name)
-    if (!items.length) return message.warning('未解析到有效数据')
-    const { created, skipped } = await userAPI.addStudents(items)
-    message.success(`导入完成：新增 ${created.length} 人${skipped.length ? `，跳过 ${skipped.length} 人` : ''}`)
-    setBatchOpen(false)
-    setBatchText('')
-    loadRows(1)
-  }
+  /** 学生导入模板列：学号/姓名必填，其余选填（服务端对年级/学院/专业做字典防呆） */
+  const studentImportColumns: ImportColumn[] = [
+    { key: 'uid', title: '学号', required: true },
+    { key: 'name', title: '姓名', required: true },
+    { key: 'sex', title: '性别', options: ['男', '女'], example: '留空默认男' },
+    { key: 'classId', title: '班级', example: '如 车辆2301班' },
+    { key: 'periods', title: '年级', options: meta?.periods, example: '如 2023级（可只填 2023）' },
+    { key: 'college', title: '学院', options: meta ? Object.keys(meta.college_major) : undefined },
+    { key: 'major', title: '专业' },
+    { key: 'phone', title: '手机号' },
+    { key: 'email', title: '邮箱' },
+  ]
+
+  /** 综合成绩导入模板列：学号+学期必填，学院/专业自动取自学生档案 */
+  const gpaImportColumns: ImportColumn[] = [
+    { key: 'uid', title: '学号', required: true },
+    { key: 'semester', title: '学期', required: true, example: '如 2024-2025-1，同一学生同学期不重复导入' },
+    { key: 'mutual', title: '互评成绩', required: true, example: '数字' },
+    { key: 'comp', title: '综测成绩', required: true, example: '数字' },
+    { key: 'gpa', title: 'GPA', required: true, example: '数字，如 3.5' },
+    { key: 'gpaRank', title: 'GPA排名', required: true, example: '整数' },
+    { key: 'compRank', title: '综测排名', required: true, example: '整数' },
+    { key: 'maxRank', title: '专业人数', required: true, example: '整数' },
+  ]
 
   const removeStudent = async (id: string) => {
     await userAPI.removeStudent(id)
@@ -220,20 +234,18 @@ export default function StudentManage() {
         {studentForm}
       </Modal>
 
-      <Modal
+      {/* 批量导入学生（Excel）：模板下载 → 上传解析 → 预览 → 导入回执 */}
+      <ExcelImportModal
+        open={batchOpen}
         title="批量导入学生"
-        open={batchOpen} onCancel={() => setBatchOpen(false)} onOk={importBatch}
-        width={560} okText="解析并导入"
-      >
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          每行一条：学号,姓名,性别,班级,学院,专业（逗号分隔，默认密码 123456）
-        </Text>
-        <Input.TextArea
-          rows={8} value={batchText} onChange={(e) => setBatchText(e.target.value)}
-          placeholder={'20239001,张三,男,202301班,计算机科学与技术学院,计算机科学与技术\n20239002,李四,女,202301班,计算机科学与技术学院,软件工程'}
-          style={{ marginTop: 8 }}
-        />
-      </Modal>
+        columns={studentImportColumns}
+        doImport={async (rows) => {
+          const items = rows.map((r) => ({ ...emptyStudent, ...r, sex: r.sex || '男' }))
+          return userAPI.addStudents(items)
+        }}
+        onDone={() => loadRows(1)}
+        onClose={() => setBatchOpen(false)}
+      />
 
       {/* 综合成绩 */}
       <Modal
@@ -248,6 +260,12 @@ export default function StudentManage() {
               <Descriptions.Item label="班级">{gpaSid.classId}</Descriptions.Item>
               <Descriptions.Item label="政治面貌">{gpaSid.politicsStatus}</Descriptions.Item>
             </Descriptions>
+            <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: '#999' }}>逐条录入或 Excel 批量导入（模板含全班的学期成绩）</span>
+              <Button size="small" icon={<UploadOutlined />} onClick={() => setGpaImportOpen(true)}>
+                Excel 批量导入
+              </Button>
+            </Space>
             <Form
               form={gpaForm} layout="inline" style={{ marginBottom: 12 }}
               onFinish={async (v) => {
@@ -304,6 +322,15 @@ export default function StudentManage() {
           </>
         )}
       </Modal>
+      {/* 批量导入综合成绩（Excel） */}
+      <ExcelImportModal
+        open={gpaImportOpen}
+        title="批量导入综合素质成绩"
+        columns={gpaImportColumns}
+        doImport={(rows) => userAPI.importGpa({ rows })}
+        onDone={() => gpaSid && loadGpa(gpaSid.id)}
+        onClose={() => setGpaImportOpen(false)}
+      />
     </Card>
   )
 }

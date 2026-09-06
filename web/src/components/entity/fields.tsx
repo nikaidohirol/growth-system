@@ -5,18 +5,37 @@ import type { FieldMeta, MetaAll } from '@/types'
 
 const { Text } = Typography
 
-/** 学分认定二级联动（kv 类型）：chiefly → minor → 自动学分 */
-function KvField({ field, meta, value, onChange }: {
+/** 规则矩阵核定预览：基准分 × 人员次序系数（与后端 assess_inn_credit 同口径） */
+export function computeCredit(
+  meta: MetaAll,
+  kvCategory: string | undefined,
+  kvValue?: string | null,
+  post?: string | null,
+): { base: number; factor: number; credit: number } | null {
+  const conf = kvCategory ? meta.innovate_kv[kvCategory] : undefined
+  if (!conf || !kvValue) return null
+  const [chiefly, minor] = String(kvValue).split(/[·/]/).map((s) => s.trim())
+  const base = conf.kv[chiefly]?.[minor]
+  if (base === undefined) return null
+  let factor = 1
+  if (conf.post_factor && post) factor = conf.post_factor[post] ?? 1
+  return { base, factor, credit: Math.round(base * factor * 100) / 100 }
+}
+
+/** 学分认定二级联动（kv 类型）：chiefly → minor → 实时核定预览 */
+function KvField({ field, meta, value, onChange, post }: {
   field: FieldMeta
   meta: MetaAll
   value?: { chiefly?: string; minor?: string }
   onChange: (v: { chiefly?: string; minor?: string }) => void
+  post?: string
 }) {
   const conf = meta.innovate_kv[field.kvCategory ?? '']
   if (!conf) return null
   const chiefies = Object.keys(conf.kv)
   const minors = value?.chiefly ? Object.keys(conf.kv[value.chiefly] ?? {}) : []
-  const credit = value?.chiefly && value?.minor ? conf.kv[value.chiefly]?.[value.minor] : undefined
+  const base = value?.chiefly && value?.minor ? conf.kv[value.chiefly]?.[value.minor] : undefined
+  const factor = conf.post_factor && post ? (conf.post_factor[post] ?? 1) : 1
   return (
     <Space direction="vertical" style={{ width: '100%' }} size={4}>
       <Space wrap>
@@ -36,10 +55,12 @@ function KvField({ field, meta, value, onChange }: {
           onChange={(minor) => onChange({ ...value, minor })}
         />
       </Space>
-      <Text type={credit === undefined ? 'secondary' : 'warning'} style={{ fontSize: 12 }}>
-        {credit === undefined
-          ? `选择${conf.chiefly_label}与${conf.minor_label}后自动计算学分`
-          : `认定学分：${credit} 学分`}
+      <Text type={base === undefined ? 'secondary' : 'warning'} style={{ fontSize: 12 }}>
+        {base === undefined
+          ? `选择${conf.chiefly_label}与${conf.minor_label}后按规则矩阵自动核定学分`
+          : factor !== 1
+            ? `核定学分：${base} × ${factor}（${post}）= ${Math.round(base * factor * 100) / 100} 学分`
+            : `核定学分：${base} 学分（按认定规则自动核定）`}
       </Text>
     </Space>
   )
@@ -52,6 +73,7 @@ export function renderFormField(
   form: FormInstance,
   kvValue?: { chiefly?: string; minor?: string },
   onKvChange?: (v: { chiefly?: string; minor?: string }) => void,
+  postValue?: string,
 ) {
   const common = { placeholder: field.placeholder || `请输入${field.label}`, style: { width: '100%' } }
   switch (field.type) {
@@ -89,7 +111,8 @@ export function renderFormField(
       )
     }
     case 'kv':
-      return <KvField field={field} meta={meta} value={kvValue} onChange={(v) => onKvChange?.(v)} />
+      return <KvField field={field} meta={meta} value={kvValue} post={postValue}
+                      onChange={(v) => onKvChange?.(v)} />
     default:
       return <Input {...common} />
   }
@@ -116,7 +139,7 @@ export function formToPayload(
   return payload
 }
 
-/** 记录行 → 表单初始值（kv 从 "A·B" 拆回两级） */
+/** 记录行 → 表单初始值（kv 从 "A·B" 拆回两级，兼容旧数据 "A / B" 分隔） */
 export function recordToForm(
   e: { fields: FieldMeta[] },
   record: Record<string, any>,
@@ -125,7 +148,7 @@ export function recordToForm(
   for (const f of e.fields) {
     if (f.type === 'date' && record[f.name]) form[f.name] = dayjs(record[f.name])
     if (f.type === 'kv' && record[f.name]) {
-      const [chiefly, minor] = String(record[f.name]).split('·')
+      const [chiefly, minor] = String(record[f.name]).split(/[·/]/).map((s) => s.trim())
       form._kv = { chiefly, minor }
     }
     if (f.type === 'cascader' && record[f.name]) form[f.name] = [record[f.name], record.post]

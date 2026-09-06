@@ -3,10 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.meta import COLLEGE_MAJOR, PERIODS
 from app.models.database import (GpaComp, Innovation, User, Voluntary, get_db)
 from app.models.database import Practice as PracticeModel
 from app.models.schemas import GpaCompIn, StudentCreate, StudentUpdate
 from app.security import get_current_user, hash_password
+from app.services.oplog import log_op
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -70,15 +72,40 @@ async def _student_credits(db: AsyncSession, sid: str) -> dict:
 async def add_students(payload: list[StudentCreate] | StudentCreate,
                        user: User = Depends(get_current_user),
                        db: AsyncSession = Depends(get_db)):
+    """单个/批量新增学生（Excel 导入：前端解析后按行提交，服务端字典防呆 + 留痕）"""
     if user.role not in ("Counsellor", "Dean"):
         raise HTTPException(403, "无权操作")
     items = payload if isinstance(payload, list) else [payload]
-    created, skipped = [], []
-    for item in items:
+    created, skipped, errors = [], [], []
+    for i, item in enumerate(items, start=1):
+        if not item.uid.strip() or not item.name.strip():
+            errors.append({"row": i, "message": "学号或姓名为空"})
+            continue
+        # 导入防呆：年级/学院/专业必须命中业务字典（年级支持 "2023" 自动补 "级"）
+        if item.periods:
+            p = item.periods.strip()
+            if p.isdigit() and len(p) == 4:
+                p = f"{p}级"
+            if p not in PERIODS:
+                errors.append({"row": i, "message":
+                               f"年级「{item.periods}」无效，应为 {' / '.join(PERIODS)}"})
+                continue
+            item.periods = p
+        if item.college and item.college not in COLLEGE_MAJOR:
+            errors.append({"row": i, "message":
+                           f"学院「{item.college}」不在字典中（{(' / '.join(COLLEGE_MAJOR))}）"})
+            continue
+        if item.major and item.college in COLLEGE_MAJOR \
+                and item.major not in COLLEGE_MAJOR[item.college]:
+            errors.append({"row": i, "message":
+                           f"学院「{item.college}」下无专业「{item.major}」"})
+            continue
         exists = (await db.execute(select(User.id).where(User.uid == item.uid))).scalar_one_or_none()
         if exists:
             skipped.append(item.uid)
             continue
+        if not item.sex:
+            item.sex = "男"
         s = User(uid=item.uid, name=item.name, role="Student",
                  passwordHash=hash_password(item.password),
                  counsellorId=user.id if user.role == "Counsellor" else None,
@@ -86,8 +113,15 @@ async def add_students(payload: list[StudentCreate] | StudentCreate,
                     if k not in ("uid", "name", "password") and v is not None})
         db.add(s)
         created.append(item.uid)
+    if created:
+        if len(items) > 1:
+            summary = f"批量导入学生 {len(created)} 名" + \
+                      (f"，跳过 {len(skipped)} 名（学号已存在）" if skipped else "")
+        else:
+            summary = f"新增学生 {items[0].name}（{items[0].uid}）"
+        await log_op(db, user, "create", summary)
     await db.commit()
-    return {"code": 0, "data": {"created": created, "skipped": skipped}}
+    return {"code": 0, "data": {"created": created, "skipped": skipped, "errors": errors}}
 
 
 @router.put("/students/{sid}")
@@ -156,6 +190,54 @@ async def gpa_add(payload: GpaCompIn, user: User = Depends(get_current_user),
     db.add(GpaComp(**payload.model_dump()))
     await db.commit()
     return {"code": 0}
+
+
+@gpa_router.post("/import")
+async def gpa_import(payload: dict, user: User = Depends(get_current_user),
+                     db: AsyncSession = Depends(get_db)):
+    """Excel 批量导入综合成绩：行内按「学号 + 学期」提交，学院/专业自动取自学生档案，重复学期跳过"""
+    if user.role not in ("Counsellor", "Dean"):
+        raise HTTPException(403, "无权操作")
+    rows = payload.get("rows")
+    if not isinstance(rows, list) or not rows:
+        raise HTTPException(400, "没有可导入的数据")
+    uids = list({str(r.get("uid") or "").strip() for r in rows if r.get("uid")})
+    stu_map: dict[str, User] = {}
+    if uids:
+        found = (await db.execute(
+            select(User).where(User.uid.in_(uids), User.role == "Student"))).scalars().all()
+        stu_map = {s.uid: s for s in found}
+    created, errors = 0, []
+    for i, raw in enumerate(rows, start=1):
+        uid = str(raw.get("uid") or "").strip()
+        stu = stu_map.get(uid)
+        if stu is None:
+            errors.append({"row": i, "message": f"学号「{uid or '空'}」不存在"})
+            continue
+        if user.role == "Counsellor" and stu.counsellorId != user.id:
+            errors.append({"row": i, "message": f"{uid} 不在您的管理范围内"})
+            continue
+        semester = str(raw.get("semester") or "").strip()
+        if not semester:
+            errors.append({"row": i, "message": "学期不能为空"})
+            continue
+        dup = (await db.execute(select(GpaComp.id).where(
+            GpaComp.sid == stu.id, GpaComp.semester == semester))).scalar_one_or_none()
+        if dup:
+            errors.append({"row": i, "message": f"{uid} {semester} 学期成绩已存在（跳过）"})
+            continue
+        try:
+            db.add(GpaComp(sid=stu.id, semester=semester, college=stu.college or "",
+                           major=stu.major or "",
+                           mutual=float(raw["mutual"]), comp=float(raw["comp"]),
+                           gpa=float(raw["gpa"]), gpaRank=int(float(raw["gpaRank"])),
+                           compRank=int(float(raw["compRank"])), maxRank=int(float(raw["maxRank"]))))
+        except (KeyError, TypeError, ValueError):
+            errors.append({"row": i, "message": "成绩字段缺失或不是数字"})
+            continue
+        created += 1
+    await db.commit()
+    return {"code": 0, "data": {"created": created, "errors": errors}}
 
 
 @gpa_router.delete("/{row_id}")
