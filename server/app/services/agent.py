@@ -126,16 +126,20 @@ async def ensure_thread(agent, session_id: str, history: list[dict]):
                                   {"messages": msgs})
 
 
-async def stream_agent(agent, session_id: str, message: str, db, user):
-    """流式执行 Agent，逐 token yield 文本增量"""
+async def stream_agent(agent, session_id: str, message: "str | HumanMessage", db, user):
+    """流式执行 Agent，逐 token yield 文本增量（message 可为纯文本或多模态 HumanMessage）"""
     config: RunnableConfig = {
         "configurable": {"thread_id": session_id, "db": db, "user": user},
         "recursion_limit": 25,
     }
-    inputs = {"messages": [HumanMessage(content=message)]}
+    inputs = {"messages": [message if isinstance(message, HumanMessage)
+                           else HumanMessage(content=message)]}
     async for chunk, meta in agent.astream(inputs, config, stream_mode="messages"):
         if isinstance(chunk, AIMessage) and chunk.content:
-            content = chunk.content if isinstance(chunk.content, str) else str(chunk.content)
+            content = chunk.content
+            if not isinstance(content, str):  # 视觉模型可能返回 content parts
+                content = "".join(p.get("text", "") if isinstance(p, dict) else str(p)
+                                  for p in content)
             if content.strip().startswith("{") or getattr(chunk, "tool_calls", None):
                 continue  # 过滤工具调用 JSON 噪声
             yield content

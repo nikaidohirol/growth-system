@@ -1,14 +1,16 @@
-"""AI 能力路由：SSE 流式对话 / 表单智能填充 / 审核建议 / 讯飞 TTS / 会话管理"""
+"""AI 能力路由：SSE 流式对话（含多模态图片理解）/ 表单智能填充 / 审核建议 / 讯飞 TTS / 会话管理"""
 import asyncio
 import base64
 import hashlib
+import hmac
 import json
 import time
 from datetime import datetime
 from email.utils import formatdate
+from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,10 +39,36 @@ def sse(event: str, data) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
+_IMG_MIME = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+             "gif": "image/gif", "webp": "image/webp"}
+
+
+def _build_multimodal_message(message: str, images: list[str]):
+    """把 /files 图片 URL 转成 base64 data URL，构造多模态 HumanMessage（仅图片后缀）"""
+    from langchain_core.messages import HumanMessage
+    root = Path(settings.UPLOAD_DIR).resolve()
+    parts: list[dict] = []
+    for url in images[:4]:
+        rel = url.lstrip("/")
+        if rel.startswith("files/"):  # 去掉静态挂载前缀，保留日期子目录
+            rel = rel[len("files/"):]
+        path = (root / rel).resolve()
+        if not path.is_relative_to(root):  # 防路径穿越
+            continue
+        suffix = path.suffix.lstrip(".").lower()
+        if not path.is_file() or suffix not in _IMG_MIME:
+            continue
+        b64 = base64.b64encode(path.read_bytes()).decode()
+        parts.append({"type": "image_url",
+                      "image_url": {"url": f"data:{_IMG_MIME[suffix]};base64,{b64}"}})
+    parts.append({"type": "text", "text": message})
+    return HumanMessage(content=parts)
+
+
 @router.post("/chat")
 async def chat(req: ChatReq, user: User = Depends(get_current_user),
                db: AsyncSession = Depends(get_db)):
-    """SSE 流式对话：meta → token* → sources → done"""
+    """SSE 流式对话：meta → token* → sources → done；images 走多模态视觉理解"""
     # 会话管理
     if req.sessionId:
         session = await db.get(ChatSession, req.sessionId)
@@ -52,24 +80,35 @@ async def chat(req: ChatReq, user: User = Depends(get_current_user),
         await db.flush()
 
     history = await _load_history(db, session.id)
-    user_msg = ChatMessage(sessionId=session.id, role="user", content=req.message)
+    # 持久化：图片以 markdown 形式并入用户消息（历史记录 react-markdown 可直接渲染）
+    stored = req.message + "".join(f"\n\n![图片]({u})" for u in req.images)
+    user_msg = ChatMessage(sessionId=session.id, role="user", content=stored)
     db.add(user_msg)
     await db.commit()
 
+    online = llm_available()
+
     async def gen():
         yield sse("meta", {"sessionId": session.id, "title": session.title,
-                           "mode": "agent" if llm_available() else "offline"})
+                           "mode": "agent" if online else "offline"})
         full_text = []
         sources: list[dict] = []
         try:
             agent = build_agent()
             if agent is not None:
                 await ensure_thread(agent, session.id, history)
-                async for delta in stream_agent(agent, session.id, req.message, db, user):
+                message = (_build_multimodal_message(req.message, req.images)
+                           if req.images else req.message)
+                async for delta in stream_agent(agent, session.id, message, db, user):
                     full_text.append(delta)
                     yield sse("token", {"delta": delta})
                 sources = search_knowledge(req.message, k=3)
             else:
+                if req.images:
+                    notice = ("（当前为离线模式，图片理解需在 .env 配置 LLM_API_KEY，"
+                              "以下仅就文字内容回答）\n\n")
+                    full_text.append(notice)
+                    yield sse("token", {"delta": notice})
                 async for delta in stream_offline(req.message, history):
                     full_text.append(delta)
                     yield sse("token", {"delta": delta})
@@ -243,3 +282,98 @@ async def tts(payload: dict, user: User = Depends(get_current_user)):
 
     await asyncio.wait_for(run(), timeout=20)
     return StreamingResponse(iter([bytes(audio)]), media_type="audio/mpeg")
+
+
+# ---------------- 科大讯飞 实时语音听写 ASR（可选，为空时前端降级浏览器识别） ----------------
+def _rtasr_auth_url() -> str:
+    """RTASR 鉴权：signa = base64( HmacSHA1(key=apiKey, msg=MD5(appid+ts)) )，由 urlencode 统一编码一次"""
+    from urllib.parse import urlencode
+    ts = str(int(time.time()))
+    md5 = hashlib.md5(f"{settings.IFLYTEK_APP_ID}{ts}".encode()).hexdigest()
+    signa = base64.b64encode(hmac.new(
+        settings.IFLYTEK_API_KEY.encode(), md5.encode(), hashlib.sha1).digest()).decode()
+    return f"wss://rtasr.xfyun.cn/v1/ws?{urlencode({'appid': settings.IFLYTEK_APP_ID, 'ts': ts, 'signa': signa})}"
+
+
+@router.get("/asr/status")
+async def asr_status(user: User = Depends(get_current_user)):
+    return {"code": 0, "data": {"available": bool(settings.IFLYTEK_APP_ID and settings.IFLYTEK_API_KEY)}}
+
+
+@router.post("/asr")
+async def asr(audio: UploadFile = File(...), user: User = Depends(get_current_user)):
+    """一句话转写：前端上传 16k16bit 单声道 PCM，走讯飞实时语音听写，返回识别文本"""
+    if not (settings.IFLYTEK_APP_ID and settings.IFLYTEK_API_KEY):
+        raise HTTPException(501, "未配置讯飞语音识别，请使用浏览器识别")
+    try:
+        import websockets
+    except ImportError:
+        raise HTTPException(501, "服务端未安装 websockets 库")
+
+    pcm = await audio.read()
+    if not pcm:
+        raise HTTPException(400, "音频为空")
+    if len(pcm) > 16000 * 2 * 60:  # 最长 60 秒
+        raise HTTPException(400, "录音超过 60 秒，请缩短后重试")
+
+    finals: list[str] = []
+    # 常见错误码 → 用户可操作的提示
+    asr_hints = {
+        "10105": "APP_ID 无效或该应用未开通「实时语音转写」服务（讯飞控制台 → 我的应用 → 添加服务并领取免费包）",
+        "10110": "无授权许可：请在讯飞控制台领取实时语音转写免费试用包，或确认服务未到期",
+    }
+
+    async def run():
+        async with websockets.connect(_rtasr_auth_url()) as ws:
+
+            async def sender():
+                # 16k16bit 单声道：1280 字节 ≈ 40ms，官方建议按此节奏发送，过快可能导致引擎出错
+                try:
+                    frame = 1280
+                    for i in range(0, len(pcm), frame):
+                        await ws.send(pcm[i:i + frame])
+                        await asyncio.sleep(0.04)
+                    await ws.send('{"end": true}'.encode())
+                except websockets.exceptions.ConnectionClosed:
+                    pass  # 服务端提前关闭（授权错误等），错误帧交给 receiver 处理
+
+            async def receiver():
+                async for msg in ws:
+                    d = json.loads(msg)
+                    if d.get("action") == "error":
+                        code = str(d.get("code"))
+                        hint = asr_hints.get(code, d.get("desc"))
+                        raise HTTPException(500, f"讯飞语音识别错误（{code}）：{hint}")
+                    if d.get("action") != "result":
+                        continue
+                    r = json.loads(d["data"])
+                    st = r.get("cn", {}).get("st")
+                    if not st or not st.get("rt"):
+                        continue
+                    # 报文层级 rt[].ws[].cw[].w
+                    text = "".join(
+                        cw.get("w", "")
+                        for rt_ in st["rt"]
+                        for ws_ in rt_.get("ws", [])
+                        for cw in ws_.get("cw", [])
+                    )
+                    # type=0 才是最终结果；中间结果(type=1)是累计草稿、seg_id 各不相同，只保留最终帧
+                    if st.get("type") == "0" and text:
+                        finals.append(text)
+
+            await asyncio.gather(sender(), receiver())
+
+    try:
+        await asyncio.wait_for(run(), timeout=60)
+    except HTTPException:
+        raise
+    except asyncio.TimeoutError:
+        raise HTTPException(504, "语音识别超时，请重试")
+    except websockets.exceptions.InvalidStatus as e:
+        code = getattr(getattr(e, "response", None), "status_code", "?")
+        raise HTTPException(502, f"讯飞拒绝连接（HTTP {code}）：请确认已开通「实时语音转写」服务、"
+                                 f"APP_ID/API_KEY 正确，且控制台未开启 IP 白名单")
+    except (websockets.exceptions.WebSocketException, OSError) as e:
+        raise HTTPException(502, f"无法连接讯飞语音服务：{e}")
+    text = "".join(finals).strip()
+    return {"code": 0, "data": {"text": text}}
