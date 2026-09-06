@@ -1,13 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Avatar, Badge, Dropdown, Layout, Menu, theme } from 'antd'
 import type { MenuProps } from 'antd'
 import {
-  AuditOutlined, DownOutlined, ExportOutlined, IdcardOutlined, LogoutOutlined,
-  RobotOutlined, TeamOutlined, TrophyOutlined, UserOutlined,
+  AuditOutlined, BellOutlined, DownOutlined, ExportOutlined, EyeOutlined, FileSearchOutlined,
+  IdcardOutlined, LogoutOutlined, RobotOutlined, SoundOutlined, TeamOutlined, TrophyOutlined, UserOutlined,
 } from '@ant-design/icons'
+import { notificationAPI } from '@/api/modules'
 import { useAuthStore } from '@/store/auth'
 import AIChatDrawer from '@/components/chat/AIChatDrawer'
+import NotificationDrawer from '@/components/layout/NotificationDrawer'
 import type { Role } from '@/types'
 
 const { Sider, Header, Content } = Layout
@@ -43,6 +45,7 @@ function useMenu(): MenuEntry[] {
         { key: '/entity/party', icon: <UserOutlined />, label: '入党情况' },
         { key: '/grade', icon: <TrophyOutlined />, label: '综合素质成绩' },
         { key: '/export', icon: <ExportOutlined />, label: '成长档案' },
+        { key: '/publicity', icon: <SoundOutlined />, label: '院级公示栏' },
         { key: '/info', icon: <UserOutlined />, label: '个人信息' },
       ]
     }
@@ -50,13 +53,19 @@ function useMenu(): MenuEntry[] {
       return [
         { key: '/dashboard', icon: <AuditOutlined />, label: '主面板' },
         { key: '/audit', icon: <AuditOutlined />, label: '审核中心' },
+        { key: '/comp-rank', icon: <TrophyOutlined />, label: '综测测算排名' },
+        { key: '/publicity', icon: <SoundOutlined />, label: '院级公示栏' },
         { key: '/students', icon: <TeamOutlined />, label: '学生管理' },
+        { key: '/logs', icon: <FileSearchOutlined />, label: '操作日志' },
         { key: '/info', icon: <UserOutlined />, label: '个人信息' },
       ]
     }
     return [
       { key: '/dashboard', icon: <AuditOutlined />, label: '主面板' },
       { key: '/audit', icon: <AuditOutlined />, label: '审核中心' },
+      { key: '/comp-rank', icon: <TrophyOutlined />, label: '综测测算排名' },
+      { key: '/publicity', icon: <EyeOutlined />, label: '公示异议复核' },
+      { key: '/logs', icon: <FileSearchOutlined />, label: '操作日志' },
       { key: '/info', icon: <UserOutlined />, label: '个人信息' },
     ]
   }, [user?.role])
@@ -65,11 +74,29 @@ function useMenu(): MenuEntry[] {
 export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [notifUnread, setNotifUnread] = useState(0)
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuthStore()
   const { token } = theme.useToken()
   const menu = useMenu()
+
+  // 未读数轮询（60s，页面切后台暂停）——SSE 推送对本系统低频使用场景收益有限
+  useEffect(() => {
+    if (!user) return
+    let stop = false
+    const tick = async () => {
+      if (document.hidden) return
+      try {
+        const d = await notificationAPI.unread()
+        if (!stop) setNotifUnread(d.unread)
+      } catch { /* 轮询失败忽略，下轮再试 */ }
+    }
+    tick()
+    const timer = setInterval(tick, 60000)
+    return () => { stop = true; clearInterval(timer) }
+  }, [user])
 
   const activeLabel = useMemo(() => {
     for (const m of menu) {
@@ -109,6 +136,13 @@ export default function MainLayout() {
             {activeLabel ?? location.pathname.replace('/entity/', '').replace('/', '')}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <Badge count={notifUnread} size="small" overflowCount={99}>
+              <BellOutlined
+                data-testid="notification-bell"
+                style={{ fontSize: 19, color: token.colorTextSecondary, cursor: 'pointer' }}
+                onClick={() => setNotifOpen(true)}
+              />
+            </Badge>
             <Badge dot={user?.role === 'Student'} title="AI 助手">
               <RobotOutlined
                 data-testid="ai-entry"
@@ -147,6 +181,14 @@ export default function MainLayout() {
         </Content>
       </Layout>
       {user && <AIChatDrawer open={chatOpen} onClose={() => setChatOpen(false)} />}
+      {user && (
+        <NotificationDrawer
+          open={notifOpen}
+          unread={notifUnread}
+          onClose={() => setNotifOpen(false)}
+          onChanged={setNotifUnread}
+        />
+      )}
     </Layout>
   )
 }

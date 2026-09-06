@@ -12,7 +12,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.models.database import init_db
-from app.routers import ai, audit, auth, dashboard, entities, experience, files, meta_router, users
+from app.routers import (ai, audit, auth, dashboard, entities, experience, files,
+                         logs, meta_router, notifications, objections, users)
 
 logger = logging.getLogger("growth-system")
 
@@ -39,8 +40,10 @@ app.add_middleware(
 
 app.mount("/files", StaticFiles(directory=settings.UPLOAD_DIR, check_dir=False), name="files")
 
-for r in (auth, meta_router, entities, audit, dashboard, users, experience, files, ai):
+for r in (auth, meta_router, entities, audit, objections, dashboard, users, experience,
+          files, logs, ai, notifications):
     app.include_router(r.router)
+app.include_router(users.gpa_router)
 
 
 @app.get("/api/health")

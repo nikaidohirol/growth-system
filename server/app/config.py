@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     IFLYTEK_API_KEY: str = ""
     IFLYTEK_API_SECRET: str = ""
 
+    # ---- SMTP 邮件触达（可选，为空时降级为仅站内信）----
+    SMTP_HOST: str = ""                   # 如 smtp.qq.com / smtp.163.com
+    SMTP_PORT: int = 465                  # 465=SSL，587=STARTTLS
+    SMTP_USER: str = ""                   # 发件邮箱账号
+    SMTP_PASS: str = ""                   # 邮箱服务商的授权码（非登录密码）
+    SMTP_FROM: str = ""                   # 发件人显示地址，默认取 SMTP_USER
+
     # ---- 权限 ----
     DEAN_UID: str = "D0001"
 
