@@ -26,6 +26,9 @@ async def login(req: LoginReq, db: AsyncSession = Depends(get_db)):
     user = (await db.execute(select(User).where(User.uid == req.uid))).scalar_one_or_none()
     if user is None or not verify_password(req.password, user.passwordHash):
         raise HTTPException(401, "账号或密码错误")
+    from app.services.oplog import log_op
+    await log_op(db, user, "login", f"{user.role}「{user.name}」登录系统")
+    await db.commit()
     token = create_access_token(user)
     return {"code": 0, "data": {"token": token, "user": await to_user_out(db, user)}}
 
