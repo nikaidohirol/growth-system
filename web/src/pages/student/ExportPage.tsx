@@ -6,23 +6,25 @@ import jsPDF from 'jspdf'
 import * as XLSX from 'xlsx'
 import { exportAPI } from '@/api/modules'
 
+type Row = Record<string, unknown>
 type Dossier = {
   student: Record<string, string | null>
-  experiences: Record<string, string>[]
-  gpaList: Record<string, string | number>[]
-  parties: Record<string, string>[]
-  organizations: Record<string, string>[]
-  honors: Record<string, string>[]
-  certificates: Record<string, string>[]
-  voluntarys: Record<string, string | number>[]
-  practices: Record<string, string>[]
-  innovations: Record<string, Record<string, string>[]>
+  experiences: Row[]
+  gpaList: Row[]
+  parties: Row[]
+  organizations: Row[]
+  honors: Row[]
+  certificates: Row[]
+  voluntarys: Row[]
+  practices: Row[]
+  innovations: Record<string, Row[]>
 }
 
-const empty: Record<string, never>[] = []
-
-function Table({ head, rows }: { head: string[]; rows: Record<string, unknown>[] }) {
-  if (!rows.length) return <p style={{ fontSize: 11, color: '#999', textAlign: 'center', margin: '4px 0' }}>暂无记录</p>
+/** head 为中文表头，keys 与之一一对应取行数据 */
+function Table({ head, keys, rows }: { head: string[]; keys: string[]; rows: Row[] }) {
+  if (!rows.length) {
+    return <p style={{ fontSize: 11, color: '#999', textAlign: 'center', margin: '4px 0' }}>暂无记录</p>
+  }
   return (
     <table>
       <thead>
@@ -30,14 +32,24 @@ function Table({ head, rows }: { head: string[]; rows: Record<string, unknown>[]
       </thead>
       <tbody>
         {rows.map((r, i) => (
-          <tr key={i}>{head.map((h) => <td key={h}>{String(r[h] ?? '-')}</td>)}</tr>
+          <tr key={i}>{keys.map((k) => <td key={k}>{String(r[k] ?? '-')}</td>)}</tr>
         ))}
       </tbody>
     </table>
   )
 }
 
-/** A4 成长档案：5 页卡片，水印 + PDF/Excel 一键导出 */
+/** 把英文键行数据转成中文键（Excel 导出用），keys: 英文键 -> 中文表头 */
+function zh(rows: Row[], keys: Record<string, string>): Row[] {
+  return rows.map((r) => Object.fromEntries(Object.entries(keys).map(([k, z]) => [z, r[k]])))
+}
+
+const INN_CAT_ZH: Record<string, string> = {
+  chair: '前沿学术报告', project: '年度创新创业项目', competition: '科技创新竞赛',
+  enterprise: '创业实践', paper: '学术论文', patent: '申请专利', other: '其他实践活动',
+}
+
+/** A4 成长档案：5 页卡片，水印 + PDF/Excel 一键导出（仅含审核通过记录） */
 export default function ExportPage() {
   const [data, setData] = useState<Dossier | null>(null)
   const [exporting, setExporting] = useState('')
@@ -49,6 +61,8 @@ export default function ExportPage() {
 
   if (!data) return <Spin style={{ display: 'block', margin: '120px auto' }} />
   const s = data.student
+  const innAll = Object.entries(data.innovations).flatMap(([cat, rows]) =>
+    rows.map((r) => ({ ...r, category: INN_CAT_ZH[cat] ?? cat })))
 
   const exportPDF = async () => {
     setExporting('pdf')
@@ -71,7 +85,7 @@ export default function ExportPage() {
     setExporting('xlsx')
     try {
       const wb = XLSX.utils.book_new()
-      const sheet = (name: string, head: string[], rows: Record<string, unknown>[]) => {
+      const sheet = (name: string, head: string[], rows: Row[]) => {
         const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{}], { header: head })
         XLSX.utils.book_append_sheet(wb, ws, name)
       }
@@ -83,17 +97,26 @@ export default function ExportPage() {
         { 项目: '专业', 内容: s.major }, { 项目: '生源地', 内容: s.origin },
       ]
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stu), '基本信息')
-      sheet('教育经历', ['startDate', 'endDate', 'college', 'major', 'classId'], data.experiences)
-      sheet('综合成绩', ['semester', 'gpa', 'comp', 'gpaRank', 'compRank', 'maxRank'], data.gpaList)
-      sheet('入党情况', ['date', 'type', 'department', 'boss', 'leader'], data.parties)
-      sheet('组织经历', ['team', 'type', 'post', 'startDate', 'endDate'], data.organizations)
-      sheet('个人荣誉', ['project', 'level', 'team', 'date'], data.honors)
-      sheet('技能证书', ['project', 'code', 'date'], data.certificates)
-      sheet('志愿服务', ['project', 'duration', 'sponsor'], data.voluntarys)
-      sheet('社会实践', ['team', 'type', 'theme', 'sponsor', 'startDate', 'endDate'], data.practices)
-      const inn = Object.entries(data.innovations).flatMap(([cat, rows]) => rows)
-      sheet('创新创业', ['project', 'implementation', 'honor', 'post', 'date', 'deadline', 'credit'],
-        inn as Record<string, unknown>[])
+      sheet('教育经历', ['开始日期', '结束日期', '学院', '专业', '班级'],
+        zh(data.experiences, { startDate: '开始日期', endDate: '结束日期', college: '学院', major: '专业', classId: '班级' }))
+      sheet('综合成绩', ['学期', 'GPA', '综测成绩', 'GPA排名', '综测排名', '专业人数'],
+        zh(data.gpaList, { semester: '学期', gpa: 'GPA', comp: '综测成绩', gpaRank: 'GPA排名', compRank: '综测排名', maxRank: '专业人数' }))
+      sheet('入党情况', ['日期', '发展阶段', '党支部', '介绍人', '培养联系人'],
+        zh(data.parties, { date: '日期', type: '发展阶段', department: '党支部', boss: '介绍人', leader: '培养联系人' }))
+      sheet('组织经历', ['组织名称', '类型', '职务', '开始日期', '结束日期'],
+        zh(data.organizations, { team: '组织名称', type: '类型', post: '职务', startDate: '开始日期', endDate: '结束日期' }))
+      sheet('个人荣誉', ['荣誉名称', '级别', '授予单位', '获得日期'],
+        zh(data.honors, { project: '荣誉名称', level: '级别', team: '授予单位', date: '获得日期' }))
+      sheet('技能证书', ['证书名称', '证书编号', '获得日期'],
+        zh(data.certificates, { project: '证书名称', code: '证书编号', date: '获得日期' }))
+      sheet('志愿服务', ['项目', '时长(小时)', '组织单位'],
+        zh(data.voluntarys, { project: '项目', duration: '时长(小时)', sponsor: '组织单位' }))
+      sheet('社会实践', ['团队名称', '类型', '主题', '主办单位', '开始日期', '结束日期'],
+        zh(data.practices, { team: '团队名称', type: '类型', theme: '主题', sponsor: '主办单位', startDate: '开始日期', endDate: '结束日期' }))
+      sheet('创新创业', ['类别', '名称', '说明/级别', '获奖情况', '人员次序', '日期', '学分'], zh(innAll, {
+        category: '类别', project: '名称', implementation: '说明/级别',
+        honor: '获奖情况', post: '人员次序', date: '日期', credit: '学分',
+      }))
       XLSX.writeFile(wb, `${s.name}的成长记录.xlsx`)
     } finally {
       setExporting('')
@@ -128,13 +151,13 @@ export default function ExportPage() {
             <div style={{ gridColumn: 'span 2' }}>专业：{s.major}</div>
           </div>
           <h3>教育经历</h3>
-          <Table head={['起止时间', '学院', '专业', '班级']}
-                 rows={data.experiences.map((e) => ({
-                   ...e, 起止时间: `${e.startDate} ~ ${e.endDate}`,
-                 })) as never} />
+          <Table head={['开始日期', '结束日期', '学院', '专业', '班级']}
+                 keys={['startDate', 'endDate', 'college', 'major', 'classId']}
+                 rows={data.experiences} />
           <h3>综合学分绩</h3>
           <Table head={['学期', 'GPA', '综测成绩', 'GPA排名', '综测排名', '专业人数']}
-                 rows={data.gpaList as never} />
+                 keys={['semester', 'gpa', 'comp', 'gpaRank', 'compRank', 'maxRank']}
+                 rows={data.gpaList} />
         </div>
 
         {/* P2 入党 + 组织经历 */}
@@ -143,12 +166,12 @@ export default function ExportPage() {
           <h2>思想与组织发展</h2>
           <h3>入党情况</h3>
           <Table head={['日期', '发展阶段', '党支部', '介绍人', '培养联系人']}
-                 rows={data.parties.map((p) => ({ ...p })) as never} />
+                 keys={['date', 'type', 'department', 'boss', 'leader']}
+                 rows={data.parties} />
           <h3>组织经历</h3>
-          <Table head={['组织名称', '类型', '职务', '起止时间']}
-                 rows={data.organizations.map((o) => ({
-                   ...o, 起止时间: `${o.startDate} ~ ${o.endDate}`,
-                 })) as never} />
+          <Table head={['组织名称', '类型', '职务', '开始日期', '结束日期']}
+                 keys={['team', 'type', 'post', 'startDate', 'endDate']}
+                 rows={data.organizations} />
         </div>
 
         {/* P3 荣誉 + 证书 */}
@@ -156,9 +179,11 @@ export default function ExportPage() {
           <div className="a4-watermark" />
           <h2>荣誉与技能</h2>
           <h3>个人荣誉</h3>
-          <Table head={['荣誉名称', '级别', '授予单位', '获得日期']} rows={data.honors as never} />
+          <Table head={['荣誉名称', '级别', '授予单位', '获得日期']}
+                 keys={['project', 'level', 'team', 'date']} rows={data.honors} />
           <h3>技能证书</h3>
-          <Table head={['证书名称', '证书编号', '获得日期']} rows={data.certificates as never} />
+          <Table head={['证书名称', '证书编号', '获得日期']}
+                 keys={['project', 'code', 'date']} rows={data.certificates} />
         </div>
 
         {/* P4 实践 */}
@@ -166,12 +191,12 @@ export default function ExportPage() {
           <div className="a4-watermark" />
           <h2>社会实践</h2>
           <h3>社会实践活动</h3>
-          <Table head={['团队名称', '类型', '主题', '主办单位', '时间']}
-                 rows={data.practices.map((p) => ({
-                   ...p, 时间: `${p.startDate} ~ ${p.endDate}`,
-                 })) as never} />
+          <Table head={['团队名称', '类型', '主题', '主办单位', '开始日期', '结束日期']}
+                 keys={['team', 'type', 'theme', 'sponsor', 'startDate', 'endDate']}
+                 rows={data.practices} />
           <h3>志愿服务活动</h3>
-          <Table head={['项目', '时长(小时)', '组织单位']} rows={data.voluntarys as never} />
+          <Table head={['项目', '时长(小时)', '组织单位']}
+                 keys={['project', 'duration', 'sponsor']} rows={data.voluntarys} />
         </div>
 
         {/* P5 创新创业 */}
@@ -179,33 +204,28 @@ export default function ExportPage() {
           <div className="a4-watermark" />
           <h2>创新创业实践</h2>
           <h3>前沿学术报告</h3>
-          <Table head={['讲座系列', '主题/场次', '学分']}
-                 rows={data.innovations.chair ?? empty} />
+          <Table head={['讲座系列', '报告主题/场次', '学分']}
+                 keys={['project', 'implementation', 'credit']}
+                 rows={data.innovations.chair ?? []} />
           <h3>年度创新创业项目</h3>
-          <Table head={['项目名称', '立项级别', '角色', '学分']}
-                 rows={(data.innovations.project ?? []).map((r) => ({
-                   project: r.implementation, implementation: r.project, post: r.post, credit: r.credit,
-                 }))} />
+          <Table head={['项目名称', '立项级别', '承担角色', '结题时间', '学分']}
+                 keys={['implementation', 'project', 'post', 'deadline', 'credit']}
+                 rows={data.innovations.project ?? []} />
           <h3>科技创新竞赛</h3>
-          <Table head={['竞赛名称', '获奖情况', '人员次序', '日期', '学分']}
-                 rows={data.innovations.competition ?? empty} />
+          <Table head={['竞赛名称', '获奖情况', '人员次序', '获奖日期', '学分']}
+                 keys={['project', 'honor', 'post', 'date', 'credit']}
+                 rows={data.innovations.competition ?? []} />
           <h3>创业实践</h3>
-          <Table head={['项目名称', '类型', '角色', '日期', '学分']}
-                 rows={(data.innovations.enterprise ?? []).map((r) => ({
-                   project: r.project, implementation: r.implementation, post: r.post, date: r.date, credit: r.credit,
-                 }))} />
+          <Table head={['创业项目名称', '创业类型', '承担角色', '日期', '学分']}
+                 keys={['project', 'implementation', 'post', 'date', 'credit']}
+                 rows={data.innovations.enterprise ?? []} />
           <h3>学术论文 / 申请专利 / 其他</h3>
           <Table head={['名称', '认定情况', '日期', '学分']}
+                 keys={['project', 'implementation', 'date', 'credit']}
                  rows={[
-                   ...(data.innovations.paper ?? []).map((r) => ({
-                     名称: r.project, 认定情况: r.implementation, 日期: r.date, 学分: r.credit,
-                   })),
-                   ...(data.innovations.patent ?? []).map((r) => ({
-                     名称: r.project, 认定情况: r.implementation, 日期: r.date, 学分: r.credit,
-                   })),
-                   ...(data.innovations.other ?? []).map((r) => ({
-                     名称: r.project, 认定情况: r.implementation, 日期: r.date, 学分: r.credit,
-                   })),
+                   ...(data.innovations.paper ?? []),
+                   ...(data.innovations.patent ?? []),
+                   ...(data.innovations.other ?? []),
                  ]} />
         </div>
       </div>

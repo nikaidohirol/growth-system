@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { App, Button, Card, Form, Input, Tag, Typography } from 'antd'
+import { App, Button, Card, Form, Input } from 'antd'
 import { KeyOutlined, UserOutlined } from '@ant-design/icons'
 import { authAPI } from '@/api/modules'
 import { useAuthStore } from '@/store/auth'
-
-const { Text } = Typography
+import collegeLogo from '@/assets/college-logo.png'
 
 export default function Login() {
   const { message } = App.useApp()
@@ -31,6 +30,7 @@ export default function Login() {
   return (
     <div className="login-page">
       <Card className="login-card" styles={{ body: { padding: 0 } }}>
+        <img className="login-logo" src={collegeLogo} alt="汽车工程学院" draggable={false} />
         <div className="login-title">AI 学生成长发展系统</div>
         <div className="login-sub">Student Growth &amp; Development System</div>
         <Form layout="vertical" onFinish={onFinish} initialValues={{ uid: '', password: '' }}>
@@ -44,12 +44,6 @@ export default function Login() {
             登 录
           </Button>
         </Form>
-        <div style={{ marginTop: 20, display: 'grid', gap: 4 }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>演示账号（密码均为 123456）：</Text>
-          <Text style={{ fontSize: 12 }}><Tag color="blue">学生</Tag>202300001 ~ 202300012</Text>
-          <Text style={{ fontSize: 12 }}><Tag color="green">辅导员</Tag>C0001</Text>
-          <Text style={{ fontSize: 12 }}><Tag color="purple">院长</Tag>D0001</Text>
-        </div>
       </Card>
     </div>
   )
