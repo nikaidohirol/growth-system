@@ -10,8 +10,8 @@ import os
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import (JSON, DateTime, Float, ForeignKey, Integer, String,
-                        Text, UniqueConstraint, select)
+from sqlalchemy import (JSON, Boolean, DateTime, Float, ForeignKey, Integer,
+                        String, Text, UniqueConstraint, select)
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -36,6 +36,12 @@ AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_co
 
 async def get_db():
     async with AsyncSessionLocal() as session:
+        # 公示期满惰性晋升：每次请求顺带一条 UPDATE（无后台调度器；耗时微秒级，失败不阻断业务）
+        try:
+            from app.services.audit_flow import promote_expired
+            await promote_expired(session)
+        except Exception:
+            pass
         yield session
 
 
@@ -67,13 +73,65 @@ class User(Base):
 
 
 class AuditMixin:
-    """内嵌审核字段：学生提交即进入『待审核』，辅导员通过/驳回后回写"""
-    status: Mapped[str] = mapped_column(String(16), default="待审核", index=True)  # 待审核/通过/驳回
+    """内嵌审核字段：学生提交即进入『待审核』，按审核流状态机流转
+
+    状态机：待审核 →(辅导员通过·院长终审类)→ 待院长审批 →(院长通过)→ 公示中 →(期满惰性)→ 通过
+            待审核 →(辅导员通过·日常类)→ 公示中；任意非生效态可驳回，驳回后学生可修改重报
+    「通过」恒等于已生效：学分统计、看板等所有 status=='通过' 查询语义自动正确
+    """
+    status: Mapped[str] = mapped_column(String(16), default="待审核", index=True)
     auditor: Mapped[str | None] = mapped_column(String(64))
     opinion: Mapped[str | None] = mapped_column(String(255))
     auditTime: Mapped[str | None] = mapped_column(String(32))
+    publicEnd: Mapped[str | None] = mapped_column(String(32))   # 公示截止时间（公示中状态使用）
     files: Mapped[list | None] = mapped_column(JSON, default=list)  # [{label, url}]
     createdAt: Mapped[str] = mapped_column(String(32), default=lambda: now().strftime("%Y-%m-%d %H:%M:%S"))
+
+
+class OperationLog(Base):
+    """操作日志（合规留痕）
+
+    设计要点：
+    - 只增不删不改：不提供任何 update/delete 接口，审计链路不可篡改
+    - scope 字段（sid）承载记录归属学生 → 数据权限按角色过滤
+    - summary 存人读摘要（字段级 diff / 审核结论），避免前端再做拼装
+    """
+    __tablename__ = "operation_logs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=gen_id)
+    uid: Mapped[str] = mapped_column(String(32), index=True)                # 操作人账号
+    operatorName: Mapped[str] = mapped_column(String(64))
+    role: Mapped[str] = mapped_column(String(16))                           # 操作时角色
+    action: Mapped[str] = mapped_column(String(16), index=True)             # create/update/delete/audit/login
+    entityKey: Mapped[str | None] = mapped_column(String(32), index=True)   # 实体 key（登录为 NULL）
+    entityLabel: Mapped[str | None] = mapped_column(String(32))
+    recordId: Mapped[str | None] = mapped_column(String(32), index=True)    # 关联记录 id
+    sid: Mapped[str | None] = mapped_column(String(32), index=True)         # 记录归属学生（数据权限）
+    summary: Mapped[str] = mapped_column(Text)                              # 人读摘要
+    createdAt: Mapped[str] = mapped_column(String(32), index=True,
+                                           default=lambda: now().strftime("%Y-%m-%d %H:%M:%S"))
+
+
+class Notification(Base):
+    """站内通知（消息触达）
+
+    设计要点：
+    - 一份数据，多个渠道：消息本体只存这张表，邮件是异步旁路（未配置 SMTP 自动降级）
+    - 私人数据：仅按 uid（学号）查本人，无跨角色查询
+    - linkKey/linkId 承载深链：前端点击直达对应记录详情
+    """
+    __tablename__ = "notifications"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=gen_id)
+    uid: Mapped[str] = mapped_column(String(32), index=True)                # 接收人学号/工号
+    title: Mapped[str] = mapped_column(String(128))
+    content: Mapped[str] = mapped_column(Text, default="")
+    type: Mapped[str] = mapped_column(String(16), default="audit")          # audit / system
+    linkKey: Mapped[str | None] = mapped_column(String(32))                 # 实体 key（深链）
+    linkId: Mapped[str | None] = mapped_column(String(32))                  # 记录 id
+    isRead: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    createdAt: Mapped[str] = mapped_column(String(32), index=True,
+                                           default=lambda: now().strftime("%Y-%m-%d %H:%M:%S"))
 
 
 class Practice(Base, AuditMixin):
@@ -203,6 +261,28 @@ class ChatMessage(Base):
     role: Mapped[str] = mapped_column(String(16))           # user / assistant
     content: Mapped[str] = mapped_column(Text)
     sources: Mapped[list | None] = mapped_column(JSON)      # RAG 命中的知识片段
+    createdAt: Mapped[str] = mapped_column(String(32), default=lambda: now().strftime("%Y-%m-%d %H:%M:%S"))
+
+
+class Objection(Base):
+    """公示异议（公示期监督闭环）：实名异议 → 院长复核（成立→记录驳回 / 不成立→维持认定）
+
+    跨实体单表：key + recordId 关联各实体记录；挂着「待复核」异议的公示记录
+    暂停惰性晋升（见 audit_flow.promote_expired），杜绝有人异议却自动生效
+    """
+    __tablename__ = "objections"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=gen_id)
+    key: Mapped[str] = mapped_column(String(32), index=True)        # 实体 key
+    recordId: Mapped[str] = mapped_column(String(32), index=True)   # 被异议记录 id
+    recordLabel: Mapped[str] = mapped_column(String(32))            # 实体名称（展示冗余）
+    recordTitle: Mapped[str] = mapped_column(String(128))           # 认定内容标题（提交时快照）
+    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"), index=True)  # 被异议记录归属学生
+    objectorUid: Mapped[str] = mapped_column(String(32))            # 异议人账号（实名）
+    objectorName: Mapped[str] = mapped_column(String(64))
+    reason: Mapped[str] = mapped_column(Text)                       # 异议理由（必填）
+    status: Mapped[str] = mapped_column(String(16), default="待复核", index=True)
+    handledBy: Mapped[str | None] = mapped_column(String(64))       # 复核人
+    handledTime: Mapped[str | None] = mapped_column(String(32))
     createdAt: Mapped[str] = mapped_column(String(32), default=lambda: now().strftime("%Y-%m-%d %H:%M:%S"))
 
 

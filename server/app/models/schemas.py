@@ -106,6 +106,8 @@ class PasswordChange(BaseModel):
 class ChatReq(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
     sessionId: str | None = None
+    images: list[str] = Field(default=[], max_length=4,
+                              description="随消息发送的图片 URL（/files/xxx），多模态视觉理解")
 
 
 class FormAssistReq(BaseModel):
