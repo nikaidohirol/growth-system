@@ -15,6 +15,9 @@ const GradePage = lazy(() => import('@/pages/student/GradePage'))
 const ExportPage = lazy(() => import('@/pages/student/ExportPage'))
 const AuditCenter = lazy(() => import('@/pages/counsellor/AuditCenter'))
 const StudentManage = lazy(() => import('@/pages/counsellor/StudentManage'))
+const CompRankingPage = lazy(() => import('@/pages/counsellor/CompRankingPage'))
+const OpLogPage = lazy(() => import('@/pages/counsellor/OpLogPage'))
+const PublicityBoard = lazy(() => import('@/pages/common/PublicityBoard'))
 const InfoPage = lazy(() => import('@/pages/info/InfoPage'))
 
 function PageFallback() {
@@ -59,7 +62,10 @@ export default function App() {
           <Route path="grade" element={<Guard roles={['Student']}><GradePage /></Guard>} />
           <Route path="export" element={<Guard roles={['Student']}><ExportPage /></Guard>} />
           <Route path="audit" element={<Guard roles={['Counsellor', 'Dean']}><AuditCenter /></Guard>} />
+          <Route path="comp-rank" element={<Guard roles={['Counsellor', 'Dean']}><CompRankingPage /></Guard>} />
           <Route path="students" element={<Guard roles={['Counsellor', 'Dean']}><StudentManage /></Guard>} />
+          <Route path="logs" element={<Guard roles={['Counsellor', 'Dean']}><OpLogPage /></Guard>} />
+          <Route path="publicity" element={<PublicityBoard />} />
           <Route path="info" element={<InfoPage />} />
           <Route path="*" element={<NotFound />} />
         </Route>
