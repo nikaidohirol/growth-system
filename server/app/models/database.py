@@ -1,4 +1,4 @@
-﻿"""SQLAlchemy 数据模型
+"""SQLAlchemy 数据模型
 
 设计要点：
 - 单一 User 表承载 Student / Counsellor / Dean 三种角色（RBAC）
@@ -6,6 +6,7 @@
   替代旧系统 13 套 entity + audit 双表接口
 - Innovation 用 category 字段承载 7 类双创（chair/project/competition/enterprise/paper/patent/other）
 """
+import asyncio
 import uuid
 from datetime import datetime, timezone
 
@@ -291,13 +292,28 @@ class Objection(Base):
     createdAt: Mapped[str] = mapped_column(String(32), default=lambda: now().strftime("%Y-%m-%d %H:%M:%S"))
 
 
+def _run_alembic(target: str) -> None:
+    """programmatic 跑 Alembic（同步 command）。
+
+    schema 单一事实源 = migrations/（create_all 弃用——PG 严格外键场景下
+    两套建表路径容易漂移，迁移链才是可演进的正路）
+    """
+    from alembic import command
+    from alembic.config import Config
+
+    from app.config import BASE_DIR
+
+    cfg = Config(str(BASE_DIR / "alembic.ini"))
+    cfg.set_main_option("script_location", str(BASE_DIR / "migrations"))
+    command.upgrade(cfg, target)
+
+
 async def init_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """建表统一走迁移链；同步命令放线程池避免阻塞事件循环"""
+    await asyncio.to_thread(_run_alembic, "head")
 
 
 async def reset_db():
-    """重建库：drop 全部表后重建（SQLite 重建等价于删文件；PG / 容器场景用 SEED_RESET=1 触发）"""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+    """重建库：downgrade 到 base（drop 全部表）再 upgrade head（SEED_RESET=1 触发）"""
+    await asyncio.to_thread(_run_alembic, "base")
+    await asyncio.to_thread(_run_alembic, "head")

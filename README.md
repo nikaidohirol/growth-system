@@ -89,7 +89,7 @@ flowchart LR
         REG["entity_registry<br>(13 类实体单一契约)"]
         FLOW["audit_flow 状态机<br>+ credits 学分矩阵 + comp_score 测算"]
         AI["LangChain RAG + FAISS<br/>(LLM 可选 · 离线规则模式)"]
-        DB[("SQLite (async)<br/>→ Roadmap: PostgreSQL")]
+        DB[("PostgreSQL / SQLite<br/>(async 双驱动 + Alembic)")]
     end
     UI -->|"/api (JWT)"| R
     R --> REG --> FLOW --> DB
@@ -151,8 +151,9 @@ growth-system/
 
 ## Roadmap（主动亮差距）
 
-- [ ] SQLite → PostgreSQL（当前单机演示口径；迁移点收敛在连接工厂）
-- [ ] Docker Compose 一键起 + GitHub Actions CI（lint + pytest）
+- [x] SQLite → PostgreSQL 双驱动（连接工厂一处切换；容器/CI 跑真 PG 全量测试）
+- [x] Docker Compose 一键起（postgres + server + web/nginx）+ GitHub Actions CI（ruff + pytest + eslint + build）
+- [x] Alembic 迁移链：schema 单一事实源（baseline + 惰性晋升，弃用 create_all 双路径）
 - [ ] 前端组件测试（Vitest + React Testing Library）
 - [ ] 看板统计缓存与查询量化（压测数字待补）
 - [ ] 对接统一身份认证（当前演示账号体系）
