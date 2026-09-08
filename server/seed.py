@@ -226,10 +226,15 @@ def _sync_csv_status(csv_rows: dict, flips: list, opinion: str | None):
 
 
 async def seed():
-    await init_db()
+    import os
+    from app.models.database import reset_db
+    if os.environ.get("SEED_RESET") == "1":
+        await reset_db()          # PG / 容器场景重建库；SQLite 也可用（等价删文件）
+    else:
+        await init_db()
     async with AsyncSessionLocal() as db:
         if (await db.execute(select(User).limit(1))).scalar_one_or_none():
-            print("数据库已有数据，跳过种子（如需重建请删除 growth_dev.db 后重试）")
+            print("数据库已有数据，跳过种子（如需重建：SEED_RESET=1 python seed.py，或删除 growth_dev.db）")
             return
 
         pwd_hash = hash_password("123456")  # 同密码只算一次 bcrypt，全库复用

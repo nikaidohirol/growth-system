@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: growth
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d growth"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  server:
+    build: ./server
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/growth
+      AUTO_SEED: "1"            # 启动时自动建表+灌演示数据（已有数据跳过）
+      # SEED_RESET: "1"         # 需要强制重建演示库时打开
+      SECRET_KEY: change-me-in-prod
+      # LLM_API_KEY: sk-xxx    # 可选：配置后 AI 助手进入在线模式
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  web:
+    build: ./web
+    depends_on:
+      - server
+    ports:
+      - "3000:80"
+
+volumes:
+  pgdata:
+  uploads:

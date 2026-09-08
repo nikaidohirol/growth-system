@@ -8,7 +8,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.models.database import (Certificate, GpaComp, Honor, Innovation,
+from app.models.database import (Certificate, Honor, Innovation,
                                  Organization, Party, Practice, Voluntary)
 
 

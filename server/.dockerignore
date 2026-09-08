@@ -1,0 +1,11 @@
+.venv
+__pycache__
+*.pyc
+growth_dev.db
+*.db
+.env
+uploads/
+dataset/
+tests/
+.pytest_cache
+.ruff_cache

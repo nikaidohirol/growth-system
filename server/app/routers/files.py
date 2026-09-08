@@ -5,7 +5,6 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
 from app.config import settings
-from app.models.database import get_db
 from app.security import get_current_user
 
 router = APIRouter(prefix="/api/files", tags=["files"])

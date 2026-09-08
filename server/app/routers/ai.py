@@ -5,11 +5,8 @@ import hashlib
 import hmac
 import json
 import time
-from datetime import datetime
-from email.utils import formatdate
 from pathlib import Path
 
-import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, select
@@ -242,7 +239,6 @@ def _iflytek_auth_url() -> str:
     signature = base64.b64encode(hmac.new(
         settings.IFLYTEK_API_SECRET.encode(), signature_origin.encode(),
         hashlib.sha256).digest()).decode()
-    from urllib.parse import quote
     authorization = base64.b64encode(
         f'api_key="{settings.IFLYTEK_API_KEY}", algorithm="hmac-sha256", '
         f'headers="host date request-line", signature="{signature}"'.encode()).decode()

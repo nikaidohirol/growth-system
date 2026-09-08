@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.database import OperationLog, User, get_db
 from app.security import get_current_user
 from app.routers.entities import get_def
-from app.services.entity_registry import ENTITY_REGISTRY
 
 router = APIRouter(prefix="/api/logs", tags=["logs"])
 

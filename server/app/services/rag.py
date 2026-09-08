@@ -8,7 +8,6 @@ import hashlib
 import math
 import re
 from functools import lru_cache
-from pathlib import Path
 
 from langchain_core.embeddings import Embeddings
 

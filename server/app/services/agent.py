@@ -5,7 +5,6 @@
 - 未配置 LLM Key 时由路由层降级为离线知识库模式，不经过 Agent
 """
 import asyncio
-from typing import Annotated
 
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
@@ -14,9 +13,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 from sqlalchemy import select
 
-from app.meta import CREDIT_RULES, INNOVATE_KV
-from app.models.database import Innovation, User, Voluntary
-from app.models.database import Practice as PracticeModel
+from app.models.database import User
 from app.services.credits import compute_pandect
 from app.services.entity_registry import ENTITY_REGISTRY
 from app.services.llm import get_chat_model

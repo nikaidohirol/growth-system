@@ -6,12 +6,11 @@
   替代旧系统 13 套 entity + audit 双表接口
 - Innovation 用 category 字段承载 7 类双创（chair/project/competition/enterprise/paper/patent/other）
 """
-import os
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import (JSON, Boolean, DateTime, Float, ForeignKey, Integer,
-                        String, Text, UniqueConstraint, select)
+from sqlalchemy import (JSON, Boolean, Float, ForeignKey, Integer,
+                        String, Text)
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -30,7 +29,13 @@ def gen_id() -> str:
     return uuid.uuid4().hex
 
 
-engine = create_async_engine(settings.DATABASE_URL, echo=False)
+# 双驱动：开发默认 SQLite（aiosqlite）；生产 / CI 传 DATABASE_URL=postgresql+asyncpg://... 即切 PostgreSQL
+_db_url = settings.DATABASE_URL
+_engine_kwargs: dict = {}
+if _db_url.startswith("postgresql"):
+    # PG 连接池：容器化 / CI 场景下防陈旧连接（SQLite 文件库无需池化参数）
+    _engine_kwargs = {"pool_size": 10, "max_overflow": 20, "pool_pre_ping": True, "pool_recycle": 1800}
+engine = create_async_engine(_db_url, echo=False, **_engine_kwargs)
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
@@ -288,4 +293,11 @@ class Objection(Base):
 
 async def init_db():
     async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+
+async def reset_db():
+    """重建库：drop 全部表后重建（SQLite 重建等价于删文件；PG / 容器场景用 SEED_RESET=1 触发）"""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)

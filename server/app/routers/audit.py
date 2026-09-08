@@ -15,7 +15,7 @@ from app.models.database import User, get_db, now
 from app.models.schemas import AuditSubmitReq
 from app.security import get_current_user
 from app.routers.entities import get_def, serialize
-from app.services.audit_flow import (STATUS_DEAN, STATUS_PENDING, STATUS_PUBLIC,
+from app.services.audit_flow import (STATUS_DEAN, STATUS_PUBLIC,
                                      STATUS_REJECTED, publicity_end)
 from app.services.credits import assess_inn_row
 from app.services.entity_registry import ENTITY_REGISTRY, INN_CATEGORY, category_scope

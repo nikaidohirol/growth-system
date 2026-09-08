@@ -8,7 +8,7 @@ from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.meta import AWARD_POST, HONOR_LEVEL, ORGAN_CASCADER, PARTY_TYPE, PRACTICE_TYPE
-from app.models.database import Innovation, User, get_db, now
+from app.models.database import User, get_db, now
 from app.security import get_current_user
 from app.services.audit_flow import EDITABLE_STATUSES, window_error
 from app.services.credits import assess_inn_credit
