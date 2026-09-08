@@ -1,4 +1,5 @@
 """业务字典与学分规则（取代旧系统 /other/* 系列接口）"""
+import os
 from typing import Any
 
 # ---- 学分认定规则（与 knowledge_base/credit_rules.md 保持一致，RAG 口径统一）----
@@ -21,6 +22,10 @@ AUDIT_FLOW = {
     "windowStart": "2026-09-01",  # 本学期学生自主申报窗口（含端点）
     "windowEnd": "2026-10-15",    # 窗口外学生不可自主申报，辅导员/院长 Excel 补录不受限
 }
+
+# E2E 冒烟测试钩子：窗口强制全开，与运行日期解耦（与 pytest monkeypatch 同口径，普通部署不设置）
+if os.environ.get("GROWTH_WINDOW_ALWAYS_OPEN"):
+    AUDIT_FLOW["windowStart"], AUDIT_FLOW["windowEnd"] = "2000-01-01", "2099-12-31"
 
 # ---- 综测测算规则（过程分引擎）：系统按已生效记录实时测算，与教务导入的权威综测并存 ----
 # 总分 = 学业×0.7 + 德育×0.2 + 文体×0.1 + 创新学分加分（封顶）；权重/基准分/加分/封顶均可调，

@@ -66,3 +66,37 @@ jobs:
         run: npm run test
       - name: Build (tsc + vite)
         run: npm run build
+
+  e2e:
+    # E2E 冒烟：真实前后端 + chromium 走「申报→审核→公示」主干三链路
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: server/requirements.txt
+      - name: Install backend deps
+        run: pip install -r server/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install frontend deps
+        run: npm ci --legacy-peer-deps
+      - name: Install chromium
+        run: npx playwright install --with-deps chromium
+      - name: Smoke (playwright)
+        run: npm run e2e
+      - name: Upload trace on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: web/test-results/
+          retention-days: 3

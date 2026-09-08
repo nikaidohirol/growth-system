@@ -123,10 +123,18 @@ npm run dev                     # http://localhost:3000（/api 代理到 8000）
 
 ## 测试
 
+三层测试金字塔：**接口层（pytest 20 例）→ 组件层（Vitest + RTL 17 例）→ E2E 冒烟（Playwright 3 链路）**
+
 ```bash
-cd server
-.venv\Scripts\python -m pytest tests/ -v
-# 14 个接口用例：审核流全链路、权限越权分支、申报窗口、Excel 导入、综测测算
+# 后端：审核流全链路、权限矩阵（401/403/404/scope 隔离）、申报窗口、Excel 导入、综测测算
+cd server && .venv\Scripts\python -m pytest tests/ -v
+
+# 前端：登录态持久化、路由守卫三角色矩阵、菜单过滤、EntityPage 契约渲染
+cd web && npm run test
+
+# E2E 冒烟：真实前后端走「登录 → 学生申报 → 辅导员审核 → 公示中」主干链路
+# 自动拉起独立后端（8100，一次性 SQLite 种子库）+ 前端 preview（4173）
+cd web && npm run e2e
 ```
 
 ## 目录结构
@@ -152,9 +160,9 @@ growth-system/
 ## Roadmap（主动亮差距）
 
 - [x] SQLite → PostgreSQL 双驱动（连接工厂一处切换；容器/CI 跑真 PG 全量测试）
-- [x] Docker Compose 一键起（postgres + server + web/nginx）+ GitHub Actions CI（ruff + pytest + eslint + build）
+- [x] Docker Compose 一键起（postgres + server + web/nginx）+ GitHub Actions CI（ruff + pytest + eslint + vitest + build + E2E 冒烟）
 - [x] Alembic 迁移链：schema 单一事实源（baseline + 惰性晋升，弃用 create_all 双路径）
-- [ ] 前端组件测试（Vitest + React Testing Library）
+- [x] 前端组件测试（Vitest + React Testing Library）+ E2E 冒烟（Playwright，守护申报→审核→公示主干）
 - [ ] 看板统计缓存与查询量化（压测数字待补）
 - [ ] 对接统一身份认证（当前演示账号体系）
 
@@ -162,3 +170,4 @@ growth-system/
 
 - 后端 **8000**：`/api` 业务接口、`/files` 静态文件
 - 前端 **3000**：Vite dev server，`/api`、`/files` 代理到 8000
+- E2E 专用 **8100（后端）/ 4173（preview）**：冒烟测试独立端口，不与 dev/Docker 冲突

@@ -17,6 +17,10 @@ web/vite.config.js
 web/vite.config.d.ts
 *.tsbuildinfo
 
+# Playwright（E2E 产物）
+web/test-results/
+web/playwright-report/
+
 # IDE / 系统
 .idea/
 .vscode/
