@@ -62,5 +62,7 @@ jobs:
         run: npm ci --legacy-peer-deps
       - name: Lint (eslint)
         run: npm run lint
+      - name: Test (vitest + RTL)
+        run: npm run test
       - name: Build (tsc + vite)
         run: npm run build

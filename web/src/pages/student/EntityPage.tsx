@@ -145,7 +145,9 @@ export default function EntityPage() {
 
   const submit = async () => {
     if (!entity) return
-    const values = await form.validateFields()
+    // 必填校验未过时 validateFields 会 reject，就地提示由 antd 呈现，避免未处理拒绝
+    const values = await form.validateFields().catch(() => null)
+    if (values === null) return
     setSubmitting(true)
     try {
       const payload = formToPayload(entity, values, kv)

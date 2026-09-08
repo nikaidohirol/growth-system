@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
@@ -14,5 +15,12 @@ export default defineConfig({
       '/api': { target: 'http://localhost:8000', changeOrigin: true },
       '/files': { target: 'http://localhost:8000', changeOrigin: true },
     },
+  },
+  // Vitest 单测：jsdom + RTL，与 vite 共用插件/别名
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
+    css: false,
   },
 })
