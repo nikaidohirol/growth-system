@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import User, get_db, now
 from app.models.schemas import AuditSubmitReq
-from app.security import get_current_user
+from app.security import ReviewerDep, get_current_user
 from app.routers.entities import get_def, serialize
 from app.services.audit_flow import (STATUS_DEAN, STATUS_PUBLIC,
                                      STATUS_REJECTED, publicity_end)
@@ -44,7 +44,7 @@ async def _dean_recipients(db: AsyncSession, stu: User | None) -> list[User]:
 
 
 @router.get("/summary")
-async def summary(user: User = Depends(get_current_user),
+async def summary(user: User = ReviewerDep,
                   db: AsyncSession = Depends(get_db)):
     """各实体待审核数量汇总（辅导员 dashboard / 审核中心 tab 角标）+ 待院长审批总数"""
     sids = await scope_sids(db, user)
@@ -81,7 +81,7 @@ async def summary(user: User = Depends(get_current_user),
 async def records(key: str, status: str = "待审核",
                   page: int = Query(1, ge=1), pageSize: int = Query(10, ge=1, le=100),
                   keyword: str = "",
-                  user: User = Depends(get_current_user),
+                  user: User = ReviewerDep,
                   db: AsyncSession = Depends(get_db)):
     """按实体类型拉取审核列表（含学生信息）"""
     e = get_def(key)
