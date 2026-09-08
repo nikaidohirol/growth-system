@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   App, Button, Card, Descriptions, Form, Input, InputNumber, Modal,
-  Popconfirm, Select, Space, Table, Tag, Typography,
+  Popconfirm, Select, Space, Table, Tag,
 } from 'antd'
 import {
   DeleteOutlined, EditOutlined, FormOutlined, PlusOutlined, ReloadOutlined,
@@ -12,8 +12,6 @@ import ExcelImportModal from '@/components/common/ExcelImportModal'
 import type { ImportColumn } from '@/components/common/ExcelImportModal'
 import { useMetaStore } from '@/store/meta'
 import type { GpaRow } from '@/types'
-
-const { Text } = Typography
 
 interface StudentRow {
   id: string; uid: string; name: string; sex?: string; classId?: string
