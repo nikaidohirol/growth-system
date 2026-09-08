@@ -58,7 +58,8 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - name: Install deps
-        run: npm ci
+        # React 19 peer 冲突与本地一致，legacy-peer-deps 安装
+        run: npm ci --legacy-peer-deps
       - name: Lint (eslint)
         run: npm run lint
       - name: Build (tsc + vite)

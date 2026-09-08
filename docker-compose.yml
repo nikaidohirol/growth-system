@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -15,6 +16,7 @@ services:
 
   server:
     build: ./server
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/growth
       AUTO_SEED: "1"            # 启动时自动建表+灌演示数据（已有数据跳过）
@@ -31,6 +33,7 @@ services:
 
   web:
     build: ./web
+    restart: unless-stopped
     depends_on:
       - server
     ports:

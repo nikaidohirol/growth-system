@@ -2,8 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# 默认国内镜像源（本地构建免代理）；海外/CI 可 --build-arg PIP_INDEX_URL= 覆盖
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -i ${PIP_INDEX_URL} -r requirements.txt
 
 COPY . .
 
