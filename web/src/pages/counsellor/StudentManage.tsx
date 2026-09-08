@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  App, Button, Card, Col, Descriptions, Form, Input, InputNumber, Modal,
-  Popconfirm, Select, Space, Table, Tabs, Tag, Typography,
+  App, Button, Card, Descriptions, Form, Input, InputNumber, Modal,
+  Popconfirm, Select, Space, Table, Tag, Typography,
 } from 'antd'
 import {
   DeleteOutlined, EditOutlined, FormOutlined, PlusOutlined, ReloadOutlined,
@@ -46,6 +46,7 @@ export default function StudentManage() {
   const [gpaImportOpen, setGpaImportOpen] = useState(false)
   const [editing, setEditing] = useState<StudentRow | null>(null)
   const [form] = Form.useForm()
+  const collegeWatch = Form.useWatch('college', form)   // Hook 必须顶层调用（曾误写入 JSX 导致条件调用）
 
   // 综合成绩 tab
   const [gpaSid, setGpaSid] = useState<StudentRow | null>(null)
@@ -65,7 +66,7 @@ export default function StudentManage() {
     } finally {
       setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [page, pageSize, keyword, periods])
 
   useEffect(() => { loaded && loadRows() }, [loaded, page, pageSize]) // eslint-disable-line
@@ -73,12 +74,12 @@ export default function StudentManage() {
   const loadGpa = useCallback(async (sid: string) => {
     setGpaRows(await userAPI.gpaList(sid).catch(() => []))
   }, [])
-  useEffect(() => { gpaSid && loadGpa(gpaSid.id) }, [gpaSid, loadGpa])
+  useEffect(() => { if (gpaSid) loadGpa(gpaSid.id) }, [gpaSid, loadGpa])
 
   const submitStudent = async () => {
     const values = await form.validateFields()
     if (editing) {
-      const { password, uid, ...rest } = values
+      const { password: _pw, uid: _uid, ...rest } = values
       await userAPI.updateStudent(editing.id, rest)
       message.success('修改成功')
     } else {
@@ -178,13 +179,13 @@ export default function StudentManage() {
           <Select
             allowClear showSearch
             options={Object.keys(meta?.college_major ?? {}).map((s) => ({ value: s }))}
-            onChange={(c) => form.setFieldValue('major', undefined)}
+            onChange={() => form.setFieldValue('major', undefined)}
           />
         </Form.Item>
         <Form.Item name="major" label="专业">
           <Select
             allowClear showSearch
-            options={(meta?.college_major?.[Form.useWatch('college', form) as string] ?? [])
+            options={(meta?.college_major?.[collegeWatch as string] ?? [])
               .map((s: string) => ({ value: s }))}
           />
         </Form.Item>

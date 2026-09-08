@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  App, Avatar, Button, Card, Col, Descriptions, Form, Input, Modal, Row,
+  App, Avatar, Button, Card, Col, Form, Input, Modal, Row,
   Select, Upload,
 } from 'antd'
 import { KeyOutlined, UploadOutlined, UserOutlined } from '@ant-design/icons'
@@ -126,7 +126,7 @@ export default function InfoPage() {
                 name="confirm" label="确认新密码"
                 rules={[
                   { required: true },
-                  ({ }) => ({
+                  () => ({
                     validator: (_, v) =>
                       v === getFieldValue('newPassword')
                         ? Promise.resolve()

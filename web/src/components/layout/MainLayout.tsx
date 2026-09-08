@@ -10,7 +10,6 @@ import { notificationAPI } from '@/api/modules'
 import { useAuthStore } from '@/store/auth'
 import AIChatDrawer from '@/components/chat/AIChatDrawer'
 import NotificationDrawer from '@/components/layout/NotificationDrawer'
-import type { Role } from '@/types'
 
 const { Sider, Header, Content } = Layout
 

@@ -39,7 +39,7 @@ export default function PublicityBoard() {
     } finally {
       setLoading(false)
     }
-  }, [objStatus]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [objStatus])  
 
   useEffect(() => { load().catch(() => undefined) }, [load])
 

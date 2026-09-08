@@ -59,5 +59,7 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Install deps
         run: npm ci
+      - name: Lint (eslint)
+        run: npm run lint
       - name: Build (tsc + vite)
         run: npm run build

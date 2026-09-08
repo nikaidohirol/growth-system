@@ -11,7 +11,7 @@ import ExcelImportModal from '@/components/common/ExcelImportModal'
 import RecordLogs from '@/components/entity/RecordLogs'
 import { useAuthStore } from '@/store/auth'
 import { useMetaStore } from '@/store/meta'
-import type { EntityMeta, EntityRecord } from '@/types'
+import type { EntityRecord } from '@/types'
 
 const STATUS_COLOR: Record<string, string> = {
   待审核: 'gold', 待院长审批: 'orange', 公示中: 'blue', 通过: 'green', 驳回: 'red',
@@ -71,7 +71,7 @@ export default function AuditCenter() {
     } finally {
       setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [activeKey, status, keyword, page, pageSize])
 
   useEffect(() => {
@@ -135,7 +135,7 @@ export default function AuditCenter() {
   const importCols = useMemo(() => [
     { key: 'sid', title: '学号', required: true, example: '记录归属学生的学号，须为本院系学生' },
     ...entityImportColumns(entity, meta),
-  ], [entity, meta]) // eslint-disable-line react-hooks/exhaustive-deps
+  ], [entity, meta])  
 
   const columns = useMemo(() => {
     if (!entity) return []
@@ -349,7 +349,7 @@ export default function AuditCenter() {
                     </span>
                   : null
               })()}
-              <span>提交时间：{detail.createdAt}　状态：<Tag color={STATUS_COLOR[detail.status]}>{detail.status}</Tag></span>
+              <span>提交时间：{detail.createdAt}{'　'}状态：<Tag color={STATUS_COLOR[detail.status]}>{detail.status}</Tag></span>
               {detail.status === '待院长审批' && (
                 <span style={{ color: '#d46b08' }}>辅导员已初审通过，等待院长终审</span>
               )}
@@ -359,7 +359,7 @@ export default function AuditCenter() {
                 </span>
               )}
               {detail.status !== '待审核' && (
-                <span>审核人：{detail.auditor}　审核时间：{detail.auditTime}　意见：{detail.opinion}</span>
+                <span>审核人：{detail.auditor}{'　'}审核时间：{detail.auditTime}{'　'}意见：{detail.opinion}</span>
               )}
             </Space>
             <Image.PreviewGroup>

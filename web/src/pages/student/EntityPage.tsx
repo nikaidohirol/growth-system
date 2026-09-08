@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import {
   App, Button, Card, Descriptions, Form, Image, Input, Modal, Popconfirm,
-  Select, Space, Spin, Table, Tag, Upload,
+  Space, Spin, Table, Tag, Upload,
 } from 'antd'
 import {
   DeleteOutlined, EditOutlined, InboxOutlined, PlusOutlined, RobotOutlined,
@@ -24,9 +24,6 @@ const STATUS_COLOR: Record<string, string> = {
 function statusTag(status: string) {
   return <Tag color={STATUS_COLOR[status] ?? 'default'}>{status}</Tag>
 }
-
-/** 学生可操作状态：仅待审核/驳回（待院长审批、公示中、已生效均锁定） */
-const EDITABLE: readonly string[] = ['待审核', '驳回']
 
 /** 当前日期是否在本学期申报窗口内（YYYY-MM-DD 字符串比较） */
 export function inApplyWindow(flow?: { windowStart: string; windowEnd: string }) {
@@ -82,7 +79,7 @@ export default function EntityPage() {
     } finally {
       setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [entity, key, page, pageSize, keyword])
 
   useEffect(() => {

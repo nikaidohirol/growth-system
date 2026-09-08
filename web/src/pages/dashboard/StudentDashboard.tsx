@@ -6,13 +6,11 @@ import EChart from '@/components/charts/EChart'
 import type { EChartsOption } from 'echarts'
 import { dashboardAPI } from '@/api/modules'
 import { useAuthStore } from '@/store/auth'
-import { useMetaStore } from '@/store/meta'
 import type { BackItem, Pandect } from '@/types'
 
 export default function StudentDashboard() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
-  const { entityByKey } = useMetaStore()
   const [pandect, setPandect] = useState<Pandect | null>(null)
   const [backs, setBacks] = useState<BackItem[]>([])
 

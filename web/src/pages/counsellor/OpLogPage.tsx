@@ -6,7 +6,6 @@ import { useMetaStore } from '@/store/meta'
 import type { OperationLog } from '@/types'
 
 const { Title, Text } = Typography
-const { RangePicker } = DatePicker
 
 const ACTION_META: Record<OperationLog['action'], { color: string; label: string }> = {
   create: { color: 'blue', label: '申报' },
