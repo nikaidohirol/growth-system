@@ -1,4 +1,4 @@
-"""SQLAlchemy 数据模型
+﻿"""SQLAlchemy 数据模型
 
 设计要点：
 - 单一 User 表承载 Student / Counsellor / Dean 三种角色（RBAC）
@@ -73,7 +73,7 @@ class User(Base):
     origin: Mapped[str | None] = mapped_column(String(64))                  # 生源地
     address: Mapped[str | None] = mapped_column(String(128))
     photo: Mapped[str | None] = mapped_column(String(255))
-    counsellorId: Mapped[str | None] = mapped_column(String(32), ForeignKey("users.id"), index=True)
+    counsellorId: Mapped[str | None] = mapped_column(String(32), ForeignKey("users.id", deferrable=True, initially="DEFERRED"), index=True)
     title: Mapped[str | None] = mapped_column(String(64))                   # 辅导员/院长职务
 
 
@@ -143,7 +143,7 @@ class Practice(Base, AuditMixin):
     """社会实践活动"""
     __tablename__ = "practices"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=gen_id)
-    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"), index=True)
+    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id", deferrable=True, initially="DEFERRED"), index=True)
     team: Mapped[str] = mapped_column(String(128))          # 实践团队名称
     startDate: Mapped[str] = mapped_column(String(16))
     endDate: Mapped[str] = mapped_column(String(16))
@@ -156,7 +156,7 @@ class Voluntary(Base, AuditMixin):
     """志愿服务活动"""
     __tablename__ = "voluntarys"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=gen_id)
-    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"), index=True)
+    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id", deferrable=True, initially="DEFERRED"), index=True)
     project: Mapped[str] = mapped_column(String(128))
     duration: Mapped[float] = mapped_column(Float)          # 服务时长（小时）
     sponsor: Mapped[str] = mapped_column(String(128))
@@ -166,7 +166,7 @@ class Honor(Base, AuditMixin):
     """个人荣誉"""
     __tablename__ = "honors"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=gen_id)
-    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"), index=True)
+    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id", deferrable=True, initially="DEFERRED"), index=True)
     project: Mapped[str] = mapped_column(String(128))       # 荣誉名称
     level: Mapped[str] = mapped_column(String(16))          # 级别
     date: Mapped[str] = mapped_column(String(16))
@@ -177,7 +177,7 @@ class Certificate(Base, AuditMixin):
     """技能证书"""
     __tablename__ = "certificates"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=gen_id)
-    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"), index=True)
+    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id", deferrable=True, initially="DEFERRED"), index=True)
     project: Mapped[str] = mapped_column(String(128))       # 证书名称
     code: Mapped[str | None] = mapped_column(String(64))    # 证书编号
     date: Mapped[str] = mapped_column(String(16))
@@ -187,7 +187,7 @@ class Organization(Base, AuditMixin):
     """组织经历"""
     __tablename__ = "organizations"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=gen_id)
-    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"), index=True)
+    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id", deferrable=True, initially="DEFERRED"), index=True)
     team: Mapped[str] = mapped_column(String(128))          # 组织名称
     type: Mapped[str] = mapped_column(String(32))           # 组织类型
     post: Mapped[str] = mapped_column(String(32))           # 担任职务
@@ -199,7 +199,7 @@ class Party(Base, AuditMixin):
     """入党情况"""
     __tablename__ = "parties"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=gen_id)
-    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"), index=True)
+    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id", deferrable=True, initially="DEFERRED"), index=True)
     date: Mapped[str] = mapped_column(String(16))
     type: Mapped[str] = mapped_column(String(32))           # 阶段
     department: Mapped[str | None] = mapped_column(String(128))  # 党支部
@@ -211,7 +211,7 @@ class Innovation(Base, AuditMixin):
     """创新创业（category 承载 7 类：chair/project/competition/enterprise/paper/patent/other）"""
     __tablename__ = "innovations"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=gen_id)
-    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"), index=True)
+    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id", deferrable=True, initially="DEFERRED"), index=True)
     category: Mapped[str] = mapped_column(String(16), index=True)
     project: Mapped[str] = mapped_column(String(128))       # 名称/题目/级别选择
     implementation: Mapped[str | None] = mapped_column(String(255))  # 补充说明（级别/场次等）
@@ -226,7 +226,7 @@ class GpaComp(Base):
     """综合素质成绩（学期 GPA + 综测）"""
     __tablename__ = "gpa_comps"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=gen_id)
-    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"), index=True)
+    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id", deferrable=True, initially="DEFERRED"), index=True)
     semester: Mapped[str] = mapped_column(String(16))
     college: Mapped[str] = mapped_column(String(64))
     major: Mapped[str] = mapped_column(String(64))
@@ -242,7 +242,7 @@ class Experience(Base):
     """教育经历（成长档案用）"""
     __tablename__ = "experiences"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=gen_id)
-    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"), index=True)
+    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id", deferrable=True, initially="DEFERRED"), index=True)
     startDate: Mapped[str] = mapped_column(String(16))
     endDate: Mapped[str] = mapped_column(String(16))
     college: Mapped[str] = mapped_column(String(64))
@@ -254,7 +254,7 @@ class Experience(Base):
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=gen_id)
-    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"), index=True)
+    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id", deferrable=True, initially="DEFERRED"), index=True)
     title: Mapped[str] = mapped_column(String(64), default="新对话")
     createdAt: Mapped[str] = mapped_column(String(32), default=lambda: now().strftime("%Y-%m-%d %H:%M:%S"))
 
@@ -262,7 +262,7 @@ class ChatSession(Base):
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=gen_id)
-    sessionId: Mapped[str] = mapped_column(String(32), ForeignKey("chat_sessions.id"), index=True)
+    sessionId: Mapped[str] = mapped_column(String(32), ForeignKey("chat_sessions.id", deferrable=True, initially="DEFERRED"), index=True)
     role: Mapped[str] = mapped_column(String(16))           # user / assistant
     content: Mapped[str] = mapped_column(Text)
     sources: Mapped[list | None] = mapped_column(JSON)      # RAG 命中的知识片段
@@ -281,7 +281,7 @@ class Objection(Base):
     recordId: Mapped[str] = mapped_column(String(32), index=True)   # 被异议记录 id
     recordLabel: Mapped[str] = mapped_column(String(32))            # 实体名称（展示冗余）
     recordTitle: Mapped[str] = mapped_column(String(128))           # 认定内容标题（提交时快照）
-    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id"), index=True)  # 被异议记录归属学生
+    sid: Mapped[str] = mapped_column(String(32), ForeignKey("users.id", deferrable=True, initially="DEFERRED"), index=True)  # 被异议记录归属学生
     objectorUid: Mapped[str] = mapped_column(String(32))            # 异议人账号（实名）
     objectorName: Mapped[str] = mapped_column(String(64))
     reason: Mapped[str] = mapped_column(Text)                       # 异议理由（必填）
