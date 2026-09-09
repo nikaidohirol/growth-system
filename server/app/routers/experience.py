@@ -15,12 +15,19 @@ from app.services.entity_registry import ENTITY_REGISTRY, INN_CATEGORY
 router = APIRouter(tags=["experience"])
 
 
+async def _resolve_target(db: AsyncSession, user: User, sid: str) -> str:
+    """查看目标：默认本人；辅导员/院长指定 sid 时必须过带班 scope（与 gpa_list 同口径）"""
+    if user.role in ("Counsellor", "Dean") and sid:
+        from app.routers.users import _check_scope
+        await _check_scope(db, user, sid)
+        return sid
+    return user.id
+
+
 @router.get("/api/experience")
 async def list_experience(sid: str = "", user: User = Depends(get_current_user),
                           db: AsyncSession = Depends(get_db)):
-    target = user.id
-    if user.role in ("Counsellor", "Dean") and sid:
-        target = sid
+    target = await _resolve_target(db, user, sid)
     rows = (await db.execute(select(Experience).where(Experience.sid == target)
                              .order_by(Experience.startDate))).scalars().all()
     return {"code": 0, "data": [{
@@ -66,9 +73,7 @@ async def delete_experience(row_id: str, user: User = Depends(get_current_user),
 async def dossier(sid: str = "", user: User = Depends(get_current_user),
                   db: AsyncSession = Depends(get_db)):
     """成长档案：一次聚合 A4 导出页所需全部数据（默认仅含审核通过项）"""
-    target = user.id
-    if user.role in ("Counsellor", "Dean") and sid:
-        target = sid
+    target = await _resolve_target(db, user, sid)
     stu = await db.get(User, target)
     if stu is None:
         raise HTTPException(404, "学生不存在")

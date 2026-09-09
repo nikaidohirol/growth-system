@@ -141,6 +141,11 @@ async def test_counsellor_scope_isolation():
         assert (await c.get("/api/users/students",
                             params={"keyword": target["uid"]})).json()["data"]["total"] == 0
         assert (await c.get("/api/gpa/list", params={"sid": target["id"]})).status_code == 403
+        # 教育经历 / 成长档案导出同样按带班隔离（与 gpa_list 同口径）
+        assert (await c.get("/api/experience",
+                            params={"sid": target["id"]})).status_code == 403
+        assert (await c.get("/api/export/dossier",
+                            params={"sid": target["id"]})).status_code == 403
         r_del = await c.delete(f"/api/users/students/{target['id']}")
         assert r_del.status_code == 403 and "管理范围" in r_del.json()["detail"]
         r_imp = (await c.post("/api/entities/practice/import", json={
