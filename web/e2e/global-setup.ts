@@ -63,14 +63,23 @@ export default async function globalSetup() {
   }
 
   // 灌一次性种子库（Docker 里由 entrypoint 做，此处直接跑 seed.py）
+  // 看门狗：seed 卡住时 300s 强杀并报错，避免 CI 上无限等待（曾致 smoke 挂 45min+）
   await new Promise<void>((resolve, reject) => {
     const seed = spawn(python, ['seed.py'], {
       cwd: path.join(ROOT, 'server'), env: serverEnv, stdio: 'inherit',
     })
-    seed.on('exit', code => code === 0
-      ? resolve()
-      : reject(new Error(`E2E: seed.py 退出码 ${code}`)))
-    seed.on('error', reject)
+    const watchdog = setTimeout(() => {
+      seed.kill()
+      reject(new Error('E2E: seed.py 超过 300s 未完成，已强杀'))
+    }, 300_000)
+    seed.on('exit', code => {
+      clearTimeout(watchdog)
+      code === 0 ? resolve() : reject(new Error(`E2E: seed.py 退出码 ${code}`))
+    })
+    seed.on('error', err => {
+      clearTimeout(watchdog)
+      reject(err)
+    })
   })
 
   backend = spawn(python, ['-m', 'uvicorn', 'main:app', '--host', '127.0.0.1',

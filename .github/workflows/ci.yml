@@ -47,6 +47,7 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: web
@@ -70,6 +71,7 @@ jobs:
   e2e:
     # E2E 冒烟：真实前后端 + chromium 走「申报→审核→公示」主干三链路
     runs-on: ubuntu-latest
+    timeout-minutes: 20 # 防挂死（曾出现 smoke 无限等待，无上限会挂到 6h 默认值）
     defaults:
       run:
         working-directory: web
