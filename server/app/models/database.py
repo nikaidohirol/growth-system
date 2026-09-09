@@ -8,7 +8,7 @@
 """
 import asyncio
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import (JSON, Boolean, Float, ForeignKey, Index, Integer,
                         String, Text)
@@ -23,7 +23,10 @@ class Base(DeclarativeBase):
 
 
 def now() -> datetime:
-    return datetime.now(timezone.utc)
+    """业务时间统一北京时间（UTC+8）：时间戳以字符串入库并直接前端渲染，
+    必须与用户时钟一致；用固定偏移避免容器 UTC 时区与跨平台 tzdata 依赖"""
+    from datetime import timedelta, timezone as tz
+    return datetime.now(tz(timedelta(hours=8)))
 
 
 def gen_id() -> str:

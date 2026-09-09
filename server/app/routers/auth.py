@@ -45,6 +45,8 @@ async def update_me(payload: dict, user: User = Depends(get_current_user),
                "politicsStatus", "origin", "address", "photo", "title"]
     for k, v in payload.items():
         if k in allowed:
+            if v is not None and (not isinstance(v, str) or len(v) > 255):
+                raise HTTPException(400, f"字段 {k} 类型或长度不合法")
             setattr(user, k, v)
     await db.commit()
     return {"code": 0, "data": await to_user_out(db, user)}

@@ -30,12 +30,18 @@ async def notify(db: AsyncSession, *, uid: str, title: str, content: str = "",
                                 type=type, key=key, record_id=record_id)))
 
 
+_background_tasks: set = set()
+
+
 def notify_by_mail(email: str | None, subject: str, content: str) -> None:
-    """邮件旁路：业务 commit 后后台发送，失败仅记日志不影响事务"""
+    """邮件旁路：业务 commit 后后台发送，失败仅记日志不影响事务。
+    任务引用入集合防 GC（CPython 对无引用 task 可能中途回收），完成后自动清理"""
     if not email:
         return
     import asyncio
-    asyncio.get_running_loop().create_task(mailer.send_async(email, subject, content))
+    task = asyncio.get_running_loop().create_task(mailer.send_async(email, subject, content))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
 
 async def backfill_notifications(db: AsyncSession) -> int:

@@ -14,9 +14,10 @@ _store: dict[str, tuple[int, float, object]] = {}   # key -> (version, expires_a
 
 
 def bump() -> None:
-    """写路径调用：全局版本 +1，所有缓存键立即失效"""
+    """写路径调用：全局版本 +1，并清空旧代数据（等价于全部失效，免去残留键的内存滞留）"""
     global _version
     _version += 1
+    _store.clear()
 
 
 def cached(key: str):

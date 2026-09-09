@@ -10,6 +10,7 @@ import {
   SearchOutlined, EyeOutlined, UploadOutlined,
 } from '@ant-design/icons'
 import { aiAPI, entityAPI, filesAPI } from '@/api/modules'
+import dayjs from 'dayjs'
 import { useMetaStore } from '@/store/meta'
 import { formToPayload, recordToForm, renderFormField } from '@/components/entity/fields'
 import { entityImportColumns } from '@/components/entity/importColumns'
@@ -25,10 +26,10 @@ function statusTag(status: string) {
   return <Tag color={STATUS_COLOR[status] ?? 'default'}>{status}</Tag>
 }
 
-/** 当前日期是否在本学期申报窗口内（YYYY-MM-DD 字符串比较） */
+/** 当前日期是否在本学期申报窗口内（YYYY-MM-DD 字符串比较；本地时区，不能用 UTC 口径） */
 export function inApplyWindow(flow?: { windowStart: string; windowEnd: string }) {
   if (!flow) return true
-  const today = new Date().toISOString().slice(0, 10)
+  const today = dayjs().format('YYYY-MM-DD')
   return flow.windowStart <= today && today <= flow.windowEnd
 }
 
