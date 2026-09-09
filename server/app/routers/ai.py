@@ -176,7 +176,6 @@ async def form_assist(req: FormAssistReq, user: User = Depends(get_current_user)
     options = {f.name: (META_ALL.get(f.options) if f.options else None)
                for f in e.fields if f.options}
 
-    model = None
     from app.services.llm import get_chat_model
     model = get_chat_model()
     if model is None:
