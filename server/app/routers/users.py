@@ -5,7 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cache import bump
 from app.meta import COLLEGE_MAJOR, PERIODS
-from app.models.database import (GpaComp, Innovation, User, Voluntary, get_db)
+from app.models.database import (ChatMessage, ChatSession, Experience, GpaComp,
+                                 Innovation, Objection, User, Voluntary, get_db)
 from app.models.database import Practice as PracticeModel
 from app.models.schemas import GpaCompIn, StudentCreate, StudentUpdate
 from app.security import get_current_user, hash_password
@@ -145,11 +146,31 @@ async def update_student(sid: str, payload: StudentUpdate,
 @router.delete("/students/{sid}")
 async def delete_student(sid: str, user: User = Depends(get_current_user),
                          db: AsyncSession = Depends(get_db)):
+    """删除学生 + 级联清理其业务数据
+
+    sid 等列带真实外键（users.id），PG 下不先清理会 IntegrityError 500；
+    SQLite 下外键默认不启用，会静默留孤儿。级联顺序：AI 对话消息 → 对话会话
+    → 公示异议 / 综合成绩 / 教育经历 / 13 类业务记录 → 用户本体。
+    操作日志（append-only，无外键）保留作为审计痕迹。
+    """
     await _check_scope(db, user, sid)
     s = await db.get(User, sid)
     if s is None:
         raise HTTPException(404, "学生不存在")
+    from sqlalchemy import delete as sa_delete
+    from app.services.entity_registry import ENTITY_REGISTRY
+
+    cleaned = 0
+    sess = select(ChatSession.id).where(ChatSession.sid == sid)
+    res = await db.execute(sa_delete(ChatMessage).where(ChatMessage.sessionId.in_(sess)))
+    cleaned += res.rowcount or 0
+    for m in [ChatSession, Objection, GpaComp, Experience,
+              *dict.fromkeys(e.model for e in ENTITY_REGISTRY.values())]:
+        res = await db.execute(sa_delete(m).where(m.sid == sid))
+        cleaned += res.rowcount or 0
     await db.delete(s)
+    await log_op(db, user, "delete",
+                 f"删除学生 {s.name}（{s.uid}），级联清理业务数据 {cleaned} 条")
     await db.commit()
     bump()
     return {"code": 0}
