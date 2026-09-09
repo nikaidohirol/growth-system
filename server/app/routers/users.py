@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.cache import bump
 from app.meta import COLLEGE_MAJOR, PERIODS
 from app.models.database import (GpaComp, Innovation, User, Voluntary, get_db)
 from app.models.database import Practice as PracticeModel
@@ -121,6 +122,7 @@ async def add_students(payload: list[StudentCreate] | StudentCreate,
             summary = f"新增学生 {items[0].name}（{items[0].uid}）"
         await log_op(db, user, "create", summary)
     await db.commit()
+    bump()
     return {"code": 0, "data": {"created": created, "skipped": skipped, "errors": errors}}
 
 
@@ -136,6 +138,7 @@ async def update_student(sid: str, payload: StudentUpdate,
         if v is not None:
             setattr(s, k, v)
     await db.commit()
+    bump()
     return {"code": 0}
 
 
@@ -148,6 +151,7 @@ async def delete_student(sid: str, user: User = Depends(get_current_user),
         raise HTTPException(404, "学生不存在")
     await db.delete(s)
     await db.commit()
+    bump()
     return {"code": 0}
 
 
@@ -189,6 +193,7 @@ async def gpa_add(payload: GpaCompIn, user: User = Depends(get_current_user),
     await _check_scope(db, user, payload.sid)
     db.add(GpaComp(**payload.model_dump()))
     await db.commit()
+    bump()
     return {"code": 0}
 
 
@@ -237,6 +242,7 @@ async def gpa_import(payload: dict, user: User = Depends(get_current_user),
             continue
         created += 1
     await db.commit()
+    bump()
     return {"code": 0, "data": {"created": created, "errors": errors}}
 
 
@@ -250,4 +256,5 @@ async def gpa_del(row_id: str, user: User = Depends(get_current_user),
         await _check_scope(db, user, row.sid)
         await db.delete(row)
         await db.commit()
+        bump()
     return {"code": 0}

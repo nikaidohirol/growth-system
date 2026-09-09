@@ -10,10 +10,10 @@ import asyncio
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import (JSON, Boolean, Float, ForeignKey, Integer,
+from sqlalchemy import (JSON, Boolean, Float, ForeignKey, Index, Integer,
                         String, Text)
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
 
 from app.config import settings
 
@@ -85,6 +85,18 @@ class AuditMixin:
             待审核 →(辅导员通过·日常类)→ 公示中；任意非生效态可驳回，驳回后学生可修改重报
     「通过」恒等于已生效：学分统计、看板等所有 status=='通过' 查询语义自动正确
     """
+    @declared_attr
+    def __table_args__(cls):
+        """复合索引按表名生成，命中两条高频查询模式：
+        - (sid, status)：数据权限 scope 过滤 + 状态统计（看板 / 审核中心 / 综测测算）
+        - (status, createdAt)：状态筛选 + 倒序排列表格（审核中心列表）
+        """
+        t = cls.__tablename__
+        return (
+            Index(f"ix_{t}_sid_status", "sid", "status"),
+            Index(f"ix_{t}_status_created", "status", "createdAt"),
+        )
+
     status: Mapped[str] = mapped_column(String(16), default="待审核", index=True)
     auditor: Mapped[str | None] = mapped_column(String(64))
     opinion: Mapped[str | None] = mapped_column(String(255))

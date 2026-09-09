@@ -8,6 +8,7 @@ from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.meta import AWARD_POST, HONOR_LEVEL, ORGAN_CASCADER, PARTY_TYPE, PRACTICE_TYPE
+from app.cache import bump
 from app.models.database import User, get_db, now
 from app.security import get_current_user
 from app.services.audit_flow import EDITABLE_STATUSES, window_error
@@ -121,6 +122,7 @@ async def create_entity(key: str, payload: dict,
                                      f"{'，核定学分 ' + _fmt(data['credit']) if 'credit' in data else ''}",
                  key=key, label=e.label, record_id=row.id, sid=user.id)
     await db.commit()
+    bump()
     return {"code": 0, "data": serialize(row, e)}
 
 
@@ -155,6 +157,7 @@ async def update_entity(key: str, row_id: str, payload: dict,
                          content=f"「{record_title(e, serialize(row, e))}」此前被驳回，已按原因修改并重新提交，请及时复审。",
                          key=key, record_id=row.id)
     await db.commit()
+    bump()
     return {"code": 0, "data": serialize(row, e)}
 
 
@@ -172,6 +175,7 @@ async def delete_entity(key: str, row_id: str,
                  key=key, label=e.label, record_id=row.id, sid=row.sid)
     await db.delete(row)
     await db.commit()
+    bump()
     return {"code": 0}
 
 
@@ -289,4 +293,5 @@ async def import_entities(key: str, payload: dict,
         except Exception as exc:                    # 单行异常不阻断整批
             errors.append({"row": i, "message": f"数据格式错误：{exc}"})
     await db.commit()
+    bump()
     return {"code": 0, "data": {"created": created, "errors": errors}}

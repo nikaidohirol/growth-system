@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.cache import bump
 from app.models.database import Objection, User, get_db, now
 from app.routers.audit import _dean_recipients, _reject, scope_sids
 from app.routers.entities import get_def, serialize
@@ -85,6 +86,7 @@ async def submit(payload: dict, user: User = Depends(get_current_user),
                      content=f"异议人 {user.name}（{user.uid}）。理由：{reason[:200]}。请及时在公示栏复核。",
                      key=e.key, record_id=record_id)
     await db.commit()
+    bump()
     return {"code": 0, "data": {"id": obj.id}}
 
 
@@ -165,4 +167,5 @@ async def review(oid: str, payload: dict, user: User = Depends(get_current_user)
                      key=obj.key, record_id=obj.recordId)
     obj.status = result
     await db.commit()
+    bump()
     return {"code": 0, "data": {"id": obj.id, "status": obj.status}}

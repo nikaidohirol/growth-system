@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.cache import bump
 from app.models.database import User, get_db, now
 from app.models.schemas import AuditSubmitReq
 from app.security import ReviewerDep, get_current_user
@@ -200,6 +201,7 @@ async def _submit_one(db: AsyncSession, e, key: str, row, user: User,
         n_title, n_content = await _enter_public(
             db, e, key, row, user, stu, opinion or "材料齐全，同意认定")
     await db.commit()
+    bump()
     if stu is not None and n_title:
         notify_by_mail(stu.email, n_title, n_content)
     return serialize(row, e)

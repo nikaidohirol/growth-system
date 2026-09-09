@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.cache import bump
 from app.models.database import (Base, Certificate, Experience, GpaComp, Honor,
                                  Innovation, Organization, Party, User,
                                  Voluntary, get_db)
@@ -57,6 +58,7 @@ async def delete_experience(row_id: str, user: User = Depends(get_current_user),
         raise HTTPException(404, "记录不存在")
     await db.delete(row)
     await db.commit()
+    bump()
     return {"code": 0}
 
 
