@@ -81,6 +81,7 @@ jobs:
           cache: pip
           cache-dependency-path: server/requirements.txt
       - name: Install backend deps
+        working-directory: . # 覆盖 job 级 web/，requirements 在仓库根的 server/ 下
         run: pip install -r server/requirements.txt
       - uses: actions/setup-node@v4
         with:
