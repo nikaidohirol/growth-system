@@ -21,9 +21,15 @@ web/vite.config.d.ts
 web/test-results/
 web/playwright-report/
 
+# Lighthouse 原始报告（README 只存截图与指标）
+docs/lighthouse/
+
 # IDE / 系统
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
 *.log
+
+# locust 缓存产物
+server/benchmarks/__pycache__/

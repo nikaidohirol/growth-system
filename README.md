@@ -157,13 +157,46 @@ growth-system/
     └── tests/                  # pytest 接口测试
 ```
 
+## 性能量化
+
+### 前端：Lighthouse 96/100（桌面端 · Chrome Headless 132）
+
+| FCP | LCP | TBT | CLS | Speed Index |
+|---|---|---|---|---|
+| **0.6 s** | **1.4 s** | **0 ms** | 0.008 | **0.6 s** |
+
+![Lighthouse 96](docs/screenshots/lighthouse.png)
+
+包体积：路由级懒加载分包，全站 gzip 合计约 **1.24 MB**，最大单块为 ECharts 344 KB / antd 主包 400 KB（均按需加载，不进首屏关键路径）。
+
+### 后端：locust 压测（50 并发 / 30s / SQLite 种子库 1.7 万条记录）
+
+三角色混合负载（学生 70% / 辅导员 20% / 院长 10%），脚本见 `server/benchmarks/locustfile.py`：
+
+| 接口 | 缓存开 p50 | 缓存关 p50 | 缓存开 p95 | 缓存关 p95 |
+|---|---|---|---|---|
+| 院长看板（52 次 count 聚合） | **12 ms** | 230 ms | **210 ms** | 5,100 ms |
+| 辅导员看板（13 实体计数） | **22 ms** | 80 ms | 2,100 ms | 2,100 ms |
+| 学生学分全景（读时计算） | **25 ms** | 39 ms | 2,800 ms | 5,100 ms |
+| 综测排名表（全量测算） | 61 ms | 74 ms | 3,500 ms | 480 ms |
+| 实体列表分页检索 | 16 ms | 24 ms | 1,700 ms | 2,200 ms |
+
+- 整体吞吐 **14.4 req/s**（50 并发、思考时间 0.5~1.5s），聚合中位延迟 35ms；看板统计 TTL 缓存（30s + 写路径版本号失效）带来**约 20 倍**中位延迟收益
+- 已知边界：登录接口在 50 并发突刺下出现 SQLite 写锁 500（`database is locked`，两次压测 9/50 与 16/50）——生产 PostgreSQL 行级锁不存在此问题；登录本身为 bcrypt 刻意慢哈希，属安全设计
+- 压测方法：`uvicorn` 单 worker 对齐容器部署形态；缓存开关经 `GROWTH_CACHE_TTL` 环境变量控制做对照实验
+
+### 支撑手段
+
+- **TTL 缓存**（`app/cache.py`）：pandect / 辅导员看板 / 院长看板 / 综测测算四个重统计端点；双保险失效 = 30s 过期 + 11 个写端点提交后 `bump()` 全局版本号，宁可多算一次不给脏数据
+- **复合索引**（Alembic `7c31a9e02f4b`）：7 张实体表补 `(sid, status)` 与 `(status, createdAt)`，分别命中「数据权限 scope + 状态统计」与「状态筛选 + 倒序分页」两条高频查询路径
+
 ## Roadmap（主动亮差距）
 
 - [x] SQLite → PostgreSQL 双驱动（连接工厂一处切换；容器/CI 跑真 PG 全量测试）
 - [x] Docker Compose 一键起（postgres + server + web/nginx）+ GitHub Actions CI（ruff + pytest + eslint + vitest + build + E2E 冒烟）
 - [x] Alembic 迁移链：schema 单一事实源（baseline + 惰性晋升，弃用 create_all 双路径）
 - [x] 前端组件测试（Vitest + React Testing Library）+ E2E 冒烟（Playwright，守护申报→审核→公示主干）
-- [ ] 看板统计缓存与查询量化（压测数字待补）
+- [x] 看板统计 TTL 缓存 + 实体表复合索引 + Lighthouse/locust 性能量化（见「性能量化」章节）
 - [ ] 对接统一身份认证（当前演示账号体系）
 
 ## 端口规范
