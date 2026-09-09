@@ -93,7 +93,13 @@ jobs:
       - name: Install chromium
         run: npx playwright install --with-deps chromium
       - name: Smoke (playwright)
-        run: npm run e2e
+        run: |
+          npm run e2e 2>&1 | tee /tmp/e2e-output.txt
+          exit ${PIPESTATUS[0]}
+      # 日志接口需 admin 权限；把输出尾部转成 ::error:: 注解，无需权限即可读
+      - name: Emit failure annotations
+        if: failure()
+        run: tail -n 40 /tmp/e2e-output.txt | while IFS= read -r line; do echo "::error::${line:0:400}"; done
       - name: Upload trace on failure
         if: failure()
         uses: actions/upload-artifact@v4

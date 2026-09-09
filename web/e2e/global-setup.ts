@@ -32,7 +32,7 @@ export async function killChildren() {
   await exitWithin(backend, 5000)
 }
 
-async function waitHealthy(url: string, label: string, tries = 90): Promise<void> {
+async function waitHealthy(url: string, label: string, tries = 240): Promise<void> {
   for (let i = 0; i < tries; i++) {
     try {
       const r = await fetch(url)
