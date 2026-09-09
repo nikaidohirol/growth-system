@@ -171,6 +171,26 @@ async def test_counsellor_scope_isolation():
         assert (await c.delete(f"/api/entities/practice/{rid2}")).json()["code"] == 0
 
 
+async def test_counsellor_single_record_scope():
+    """单记录接口（GET/PUT/DELETE）同样按带班隔离：C0001 触达 C0002 名下学生记录一律 404"""
+    stu1 = await login("202300001")
+    async with client(stu1) as c:
+        rid = (await c.post("/api/entities/practice", json={
+            "team": f"单记录隔离{RUN}", "type": "自主实践团队", "theme": "scope",
+            "sponsor": "测试学院", "startDate": "2026-07-01", "endDate": "2026-07-10",
+            "files": []})).json()["data"]["id"]
+    async with client(await login("C0002")) as c:
+        assert (await c.get(f"/api/entities/practice/{rid}")).status_code == 404
+        assert (await c.put(f"/api/entities/practice/{rid}", json={
+            "team": "越权改", "type": "自主实践团队", "theme": "x",
+            "sponsor": "x", "startDate": "2026-07-01", "endDate": "2026-07-10"})).status_code == 404
+        assert (await c.delete(f"/api/entities/practice/{rid}")).status_code == 404
+    async with client(await login("C0001")) as c:
+        assert (await c.get(f"/api/entities/practice/{rid}")).json()["code"] == 0
+    async with client(stu1) as c:
+        assert (await c.delete(f"/api/entities/practice/{rid}")).json()["code"] == 0
+
+
 # ------------------------------------------------- Student：横向越权
 async def test_student_cross_user_isolation():
     """学生读/改/删他人记录一律 404（不暴露记录存在性），自己的可正常操作"""

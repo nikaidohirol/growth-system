@@ -62,6 +62,10 @@ async def owned_row(db: AsyncSession, e, key: str, row_id: str, user: User):
     if row is None or (user.role == "Student" and row.sid != user.id) \
             or (key in INN_CATEGORY and row.category != INN_CATEGORY[key]):
         raise HTTPException(404, "记录不存在")
+    if user.role == "Counsellor":   # 辅导员仅限本班学生（404 不暴露存在性，与权限矩阵口径一致）
+        stu = await db.get(User, row.sid)
+        if stu is None or stu.counsellorId != user.id:
+            raise HTTPException(404, "记录不存在")
     return row
 
 
@@ -282,13 +286,15 @@ async def import_entities(key: str, payload: dict,
                 data["auditor"] = user.name
                 data["opinion"] = "历史数据批量导入"
                 data["auditTime"] = now().strftime("%Y-%m-%d %H:%M:%S")
-            row = e.model(id=uuid.uuid4().hex, **data)
-            db.add(row)
-            await db.flush()
-            await log_op(db, user, "create", f"批量导入{e.label}《{record_title(e, data)}》"
-                                             f"{'，核定学分 ' + _fmt(data['credit']) if 'credit' in data else ''}"
-                                             f"{'，状态 ' + want_status if user.role != 'Student' else ''}",
-                         key=key, label=e.label, record_id=row.id, sid=sid)
+            # savepoint：单行落库失败只回滚本行，不毒化整个会话（后续行与整批 commit 不受牵连）
+            async with db.begin_nested():
+                row = e.model(id=uuid.uuid4().hex, **data)
+                db.add(row)
+                await db.flush()
+                await log_op(db, user, "create", f"批量导入{e.label}《{record_title(e, data)}》"
+                                                 f"{'，核定学分 ' + _fmt(data['credit']) if 'credit' in data else ''}"
+                                                 f"{'，状态 ' + want_status if user.role != 'Student' else ''}",
+                             key=key, label=e.label, record_id=row.id, sid=sid)
             created += 1
         except Exception as exc:                    # 单行异常不阻断整批
             errors.append({"row": i, "message": f"数据格式错误：{exc}"})
