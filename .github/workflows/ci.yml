@@ -98,10 +98,20 @@ jobs:
         run: |
           npm run e2e 2>&1 | tee /tmp/e2e-output.txt
           exit ${PIPESTATUS[0]}
-      # 日志接口需 admin 权限；把输出尾部转成 ::error:: 注解，无需权限即可读
+      # 日志接口需 admin 权限；把输出尾部转成 ::error:: 注解，无需权限即可读。
+      # 过滤 vite/alembic/uvicorn INFO 噪音行 —— GitHub 注解每步上限 10 条，
+      # 不过滤的话真正的 playwright 报错会被挤到上限之外（本 run 即是）。
       - name: Emit failure annotations
         if: failure()
-        run: tail -n 40 /tmp/e2e-output.txt | while IFS= read -r line; do echo "::error::${line:0:400}"; done
+        run: |
+          grep -vE "dist/|INFO|alembic|chunk|gzip:|Deprecat|deprecat|dynamic import|manualChunks|chunkSize|larger than|^[[:space:]]*$" /tmp/e2e-output.txt | tail -n 10 | while IFS= read -r line; do echo "::error::${line:0:400}"; done
+      - name: Upload e2e log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-log
+          path: /tmp/e2e-output.txt
+          retention-days: 3
       - name: Upload trace on failure
         if: failure()
         uses: actions/upload-artifact@v4
