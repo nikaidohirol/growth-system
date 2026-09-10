@@ -3,7 +3,6 @@ import {
   Alert, App, Button, Modal, Space, Table, Tag, Typography, Upload,
 } from 'antd'
 import { DownloadOutlined, FileExcelOutlined, InboxOutlined } from '@ant-design/icons'
-import * as XLSX from 'xlsx'
 import type { ImportResult } from '@/types'
 
 const { Text } = Typography
@@ -46,6 +45,7 @@ export default function ExcelImportModal({ open, title, columns, doImport, onDon
   }, [open])
 
   const parseFile = async (file: File) => {
+    const XLSX = await import('xlsx')
     try {
       const buf = await file.arrayBuffer()
       const wb = XLSX.read(buf)
@@ -79,7 +79,8 @@ export default function ExcelImportModal({ open, title, columns, doImport, onDon
     }
   }
 
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
+    const XLSX = await import('xlsx')
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([columns.map((c) => c.title)]), '导入数据')
     const notes = [
@@ -156,8 +157,10 @@ export default function ExcelImportModal({ open, title, columns, doImport, onDon
               scroll={{ x: 'max-content' }}
               dataSource={rows.slice(0, 5).map((r, i) => ({ ...r, __i: i }))}
               rowKey="__i"
-              columns={columns.map((c) => ({
+              columns={columns.map((c, i) => ({
                 title: c.title, dataIndex: c.key, key: c.key, ellipsis: true, width: 120,
+                // 首列（学号等身份列）固定：弹窗内横向滚动时保持可见
+                fixed: i === 0 ? ('left' as const) : undefined,
                 render: (v: string) => v || <Text type="secondary">-</Text>,
               }))}
             />

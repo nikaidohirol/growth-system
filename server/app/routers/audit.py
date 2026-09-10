@@ -16,7 +16,8 @@ from app.models.database import User, get_db, now
 from app.models.schemas import AuditSubmitReq
 from app.security import ReviewerDep, get_current_user
 from app.routers.entities import get_def, serialize
-from app.services.audit_flow import (STATUS_DEAN, STATUS_PUBLIC,
+from app.services.audit_flow import (STATUS_DEAN, STATUS_PASSED,
+                                     STATUS_PENDING, STATUS_PUBLIC,
                                      STATUS_REJECTED, publicity_end)
 from app.services.credits import assess_inn_row
 from app.services.entity_registry import ENTITY_REGISTRY, INN_CATEGORY, category_scope
@@ -47,33 +48,27 @@ async def _dean_recipients(db: AsyncSession, stu: User | None) -> list[User]:
 @router.get("/summary")
 async def summary(user: User = ReviewerDep,
                   db: AsyncSession = Depends(get_db)):
-    """各实体待审核数量汇总（辅导员 dashboard / 审核中心 tab 角标）+ 待院长审批总数"""
+    """各实体待审核数量汇总（辅导员 dashboard / 审核中心 tab 角标）+ 待院长审批总数
+
+    每表一条 GROUP BY status 聚合（而非每状态一条 COUNT），9 实体共 9 条查询。
+    """
     sids = await scope_sids(db, user)
-    out, pending_total, dean_pending = [], 0, 0
+    out, pending_total, dean_pending, approved = [], 0, 0, 0
     for key, e in ENTITY_REGISTRY.items():
-        cat = category_scope(key, e.model)
-        for status, acc in (("待审核", None), ("待院长审批", "dean")):
-            q = select(func.count()).select_from(e.model).where(e.model.status == status)
-            if cat is not None:
-                q = q.where(cat)
-            if sids is not None:
-                q = q.where(e.model.sid.in_(sids))
-            n = (await db.execute(q)).scalar() or 0
-            if acc is None:
-                pending_total += n
-                if status == "待审核":
-                    out.append({"key": key, "label": e.label, "group": e.group, "count": n})
-            else:
-                dean_pending += n
-    approved = 0
-    for key, e in ENTITY_REGISTRY.items():
-        q = select(func.count()).select_from(e.model).where(e.model.status == "通过")
+        conds = [e.model.status.in_((STATUS_PENDING, STATUS_DEAN, STATUS_PASSED))]
         cat = category_scope(key, e.model)
         if cat is not None:
-            q = q.where(cat)
+            conds.append(cat)
         if sids is not None:
-            q = q.where(e.model.sid.in_(sids))
-        approved += (await db.execute(q)).scalar() or 0
+            conds.append(e.model.sid.in_(sids))
+        counts = dict((await db.execute(
+            select(e.model.status, func.count()).select_from(e.model)
+            .where(*conds).group_by(e.model.status))).all())
+        out.append({"key": key, "label": e.label, "group": e.group,
+                    "count": counts.get(STATUS_PENDING, 0)})
+        pending_total += counts.get(STATUS_PENDING, 0)
+        dean_pending += counts.get(STATUS_DEAN, 0)
+        approved += counts.get(STATUS_PASSED, 0)
     return {"code": 0, "data": {"list": out, "pendingTotal": pending_total,
                                 "approvedTotal": approved, "deanPendingTotal": dean_pending}}
 

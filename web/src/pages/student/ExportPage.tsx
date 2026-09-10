@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Card, Space, Spin } from 'antd'
 import { FileExcelOutlined, FilePdfOutlined } from '@ant-design/icons'
-import html2canvas from 'html2canvas'
-import jsPDF from 'jspdf'
-import * as XLSX from 'xlsx'
 import { exportAPI } from '@/api/modules'
 
 type Row = Record<string, unknown>
@@ -67,6 +64,9 @@ export default function ExportPage() {
   const exportPDF = async () => {
     setExporting('pdf')
     try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas'), import('jspdf'),
+      ])
       const pages = wrapRef.current?.querySelectorAll<HTMLElement>('.a4')
       if (!pages?.length) return
       const pdf = new jsPDF({ unit: 'mm', format: 'a4' })
@@ -81,9 +81,10 @@ export default function ExportPage() {
     }
   }
 
-  const exportXLSX = () => {
+  const exportXLSX = async () => {
     setExporting('xlsx')
     try {
+      const XLSX = await import('xlsx')
       const wb = XLSX.utils.book_new()
       const sheet = (name: string, head: string[], rows: Row[]) => {
         const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{}], { header: head })

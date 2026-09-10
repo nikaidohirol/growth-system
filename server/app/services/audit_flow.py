@@ -11,6 +11,8 @@
 - 学分正式核定在「进入公示」时执行；Excel 补录「直接通过」为历史数据迁移通道，不走公示
 - 申报窗口仅约束学生自主申报（create/update）；辅导员/院长的补录与审核不受窗口限制
 """
+import os
+import time
 from datetime import timedelta
 
 from sqlalchemy import select, update
@@ -44,12 +46,24 @@ def window_error() -> str | None:
     return None
 
 
+# 惰性晋升节流（秒）：窗口内跳过扫描，省去每个请求 9 条 UPDATE 的固定开销；
+# 晋升最多延迟一个窗口，语义仍是读时惰性（不引入后台调度器）。0 = 每次请求都执行（测试用）。
+PROMOTE_INTERVAL = float(os.environ.get("GROWTH_PROMOTE_INTERVAL", "20"))
+_last_promote = float("-inf")
+
+
 async def promote_expired(db: AsyncSession) -> int:
     """公示期满惰性晋升：公示中且公示期已过 → 正式生效（通过）
 
-    挂载在 get_db 依赖上每次请求顺带执行；单条 UPDATE/表，status 有索引，微秒级。
+    挂载在 get_db 依赖上随请求执行，按 PROMOTE_INTERVAL 节流（默认 20s 一轮）；
+    单条 UPDATE/表，status 有索引，微秒级。
     挂着「待复核」公示异议的记录排除在外——有人异议就先别生效，复核后再流转。
     """
+    global _last_promote
+    t0 = time.monotonic()
+    if t0 - _last_promote < PROMOTE_INTERVAL:
+        return 0
+    _last_promote = t0
     t = now().strftime("%Y-%m-%d %H:%M:%S")
     total = 0
     pending = select(Objection.recordId).where(Objection.status == "待复核")

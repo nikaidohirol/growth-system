@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Card, message, Select, Space, Table, Tag, Tooltip, Typography } from 'antd'
 import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
-import * as XLSX from 'xlsx'
 import dayjs from 'dayjs'
+import type { WorkBook } from 'xlsx'
 import { compAPI } from '@/api/modules'
 import { useAuthStore } from '@/store/auth'
 import { useMetaStore } from '@/store/meta'
@@ -25,7 +25,7 @@ const toRows = (lst: CompForecast[]) => lst.map((r) => ({
 
 const sheetCols = EXPORT_HEADER.map((h) => ({ wch: Math.max(8, h.length * 2 + 2) }))
 
-const noteSheet = (wb: XLSX.WorkBook, scope: string, n: number) => {
+const noteSheet = (XLSX: typeof import('xlsx'), wb: WorkBook, scope: string, n: number) => {
   const ws = XLSX.utils.aoa_to_sheet([
     ['综测测算汇总（系统过程分）'],
     [`范围：${scope}　人数：${n}　导出时间：${dayjs().format('YYYY-MM-DD HH:mm')}`],
@@ -78,10 +78,11 @@ export default function CompRankingPage() {
   }, [major, periods, fetchList, nonce])
 
   /** 导出当前筛选组的成绩单汇总（单 Sheet） */
-  const exportCurrent = () => {
+  const exportCurrent = async () => {
     if (!major || !periods || !list.length) return
+    const XLSX = await import('xlsx')
     const wb = XLSX.utils.book_new()
-    noteSheet(wb, `${periods} ${major}`, list.length)
+    noteSheet(XLSX, wb, `${periods} ${major}`, list.length)
     const ws = XLSX.utils.json_to_sheet(toRows(list), { header: EXPORT_HEADER })
     ws['!cols'] = sheetCols
     XLSX.utils.book_append_sheet(wb, ws, `${periods}${major}`)
@@ -93,9 +94,9 @@ export default function CompRankingPage() {
   const exportAll = async () => {
     setExporting(true)
     try {
-      const d = await compAPI.list()
+      const [d, XLSX] = await Promise.all([compAPI.list(), import('xlsx')])
       const wb = XLSX.utils.book_new()
-      noteSheet(wb, '全院（按年级×专业分 Sheet）', d.list.length)
+      noteSheet(XLSX, wb, '全院（按年级×专业分 Sheet）', d.list.length)
       const groups = new Map<string, CompForecast[]>()
       for (const r of d.list) {
         const k = `${r.periods ?? '未分年级'}${r.major ?? '未分专业'}`
@@ -124,6 +125,7 @@ export default function CompRankingPage() {
   return (
     <Card
       title="综测测算排名（系统过程分 · 同年级同专业口径）"
+      style={{ minWidth: 1300 }}
       extra={
         <Space>
           <Select
@@ -157,33 +159,33 @@ export default function CompRankingPage() {
       <Table
         key={`${periods}-${major}`}
         rowKey="sid" size="small" loading={loading} dataSource={sorted}
-        pagination={{ pageSize: 20, showTotal: (t) => `共 ${t} 人` }}
+        pagination={{ pageSize: 20, showQuickJumper: true, showTotal: (t) => `共 ${t} 人` }}
         columns={[
-          { title: '排名', dataIndex: 'majorRank', width: 70, align: 'right',
+          { title: '排名', dataIndex: 'majorRank', width: 70, align: 'center', fixed: 'left' as const,
             render: (v: number, r: CompForecast) =>
               <Text strong>{r.majorSize ? v : '—'}</Text> },
-          { title: '年级', dataIndex: 'periods', width: 90,
+          { title: '年级', dataIndex: 'periods', width: 90, align: 'center',
             render: (v: string | null) => v || '—' },
-          { title: '专业', dataIndex: 'major', width: 170,
+          { title: '专业', dataIndex: 'major', width: 170, align: 'center',
             render: (v: string | null) => v || '—' },
-          { title: '班级', dataIndex: 'classId', width: 110,
+          { title: '班级', dataIndex: 'classId', width: 110, align: 'center',
             render: (v: string | null) => v || '未分班' },
-          { title: '学号', dataIndex: 'uid', width: 110 },
-          { title: '姓名', dataIndex: 'name', width: 90 },
-          { title: '测算总分', key: 'total', width: 90, align: 'right',
+          { title: '学号', dataIndex: 'uid', width: 110, align: 'center' },
+          { title: '姓名', dataIndex: 'name', width: 90, align: 'center', fixed: 'left' as const },
+          { title: '测算总分', key: 'total', width: 90, align: 'center',
             render: (_, r: CompForecast) =>
               <Text strong>{r.total}</Text> },
-          { title: '学业', key: 'academic', width: 110, align: 'right',
+          { title: '学业', key: 'academic', width: 110, align: 'center',
             render: (_, r: CompForecast) => r.academic.gpa != null
               ? `${r.academic.score}（GPA ${r.academic.gpa}）` : '—' },
-          { title: '德育', key: 'moral', width: 80, align: 'right',
+          { title: '德育', key: 'moral', width: 80, align: 'center',
             render: (_, r: CompForecast) => r.moral.score },
-          { title: '文体', key: 'sports', width: 80, align: 'right',
+          { title: '文体', key: 'sports', width: 80, align: 'center',
             render: (_, r: CompForecast) => r.sports.score },
-          { title: '创新加分', key: 'inn', width: 90, align: 'right',
+          { title: '创新加分', key: 'inn', width: 90, align: 'center',
             render: (_, r: CompForecast) =>
               `+${r.innovation.bonus}${r.innovation.capped ? '（封顶）' : ''}` },
-          { title: '教务综测', key: 'imported', width: 130, align: 'right',
+          { title: '教务综测', key: 'imported', width: 130, align: 'center',
             render: (_, r: CompForecast) => r.imported
               ? <Tag>{r.imported.comp}（第 {r.imported.compRank}/{r.imported.maxRank}）</Tag>
               : <Text type="secondary">未导入</Text> },
