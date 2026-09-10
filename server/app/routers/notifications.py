@@ -1,6 +1,6 @@
 """站内通知 — 私人消息中心（列表/未读数/已读标记），仅按登录人 uid 查询"""
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import Notification, User, get_db
@@ -61,5 +61,14 @@ async def mark_read(payload: dict, user: User = Depends(get_current_user),
             return {"code": 0}
         q = q.where(Notification.id.in_(ids)).values(isRead=True)
     await db.execute(q)
+    await db.commit()
+    return {"code": 0}
+
+
+@router.post("/clear")
+async def clear_notifications(user: User = Depends(get_current_user),
+                              db: AsyncSession = Depends(get_db)):
+    """清空本人全部通知（不可恢复，仅作用本人）"""
+    await db.execute(delete(Notification).where(Notification.uid == user.uid))
     await db.commit()
     return {"code": 0}

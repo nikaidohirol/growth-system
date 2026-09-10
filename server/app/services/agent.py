@@ -5,6 +5,7 @@
 - 未配置 LLM Key 时由路由层降级为离线知识库模式，不经过 Agent
 """
 import asyncio
+import re
 
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
@@ -142,15 +143,27 @@ async def stream_agent(agent, session_id: str, message: "str | HumanMessage", db
             yield content
 
 
+def _fmt_hit(h: dict) -> str:
+    """知识库块 → 紧凑聊天 Markdown：去掉重复标题行、标题降级为加粗，避免大字号标题撑爆气泡"""
+    lines = h["content"].splitlines()
+    if lines and lines[0].startswith("【"):
+        lines = lines[1:]
+    out = []
+    for ln in lines:
+        m = re.match(r"^#{1,6}\s+(.*)", ln)
+        out.append(f"**{m.group(1).strip()}**" if m else ln)
+    body = "\n".join(out).strip()
+    return f"**【{h['title']}】**（{h['source']}）\n\n{body}"
+
+
 async def stream_offline(message: str, history: list[dict]):
     """离线知识库模式：RAG 检索 + 模板组装 + 模拟流式输出"""
     hits = search_knowledge(message, k=3)
     parts = ["（离线知识库模式，未配置大模型 Key，回答基于知识库检索）\n\n"]
     if hits:
         parts.append(f"就「{message}」在知识库中找到以下相关内容：\n\n")
-        for i, h in enumerate(hits, 1):
-            parts.append(f"{i}. {h['content']}\n\n")
-        parts.append("如需更个性化的解答（结合你的学分数据），请在 .env 中配置 LLM_API_KEY 后重启服务。")
+        parts.append("\n\n---\n\n".join(_fmt_hit(h) for h in hits))
+        parts.append("\n\n如需更个性化的解答（结合你的学分数据），请联系管理员接入大模型服务。")
     else:
         parts.append("知识库中暂未收录该问题的相关内容，请换个问法，或联系管理员补充知识库"
                      "（server/knowledge_base/ 目录）。")

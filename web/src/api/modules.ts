@@ -78,6 +78,7 @@ export const notificationAPI = {
   unread: () => unwrap<{ unread: number }>(http.get('/notifications/unread')),
   read: (payload: { ids?: string[]; all?: boolean }) =>
     unwrap(http.post('/notifications/read', payload)),
+  clear: () => unwrap(http.post('/notifications/clear')),
 }
 
 export const dashboardAPI = {
@@ -147,6 +148,7 @@ export const aiAPI = {
   sessions: () => unwrap<ChatSessionItem[]>(http.get('/ai/sessions')),
   sessionMessages: (sid: string) => unwrap<ChatMessageItem[]>(http.get(`/ai/sessions/${sid}/messages`)),
   removeSession: (sid: string) => unwrap(http.delete(`/ai/sessions/${sid}`)),
+  clearSessions: () => unwrap<{ cleared: number }>(http.delete('/ai/sessions')),
   tts: async (text: string): Promise<ArrayBuffer | null> => {
     try {
       const r = await http.post('/ai/tts', { text }, { responseType: 'arraybuffer' })

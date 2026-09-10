@@ -65,7 +65,7 @@ function toPcm16k(chunks: Float32Array[], srcRate: number): Blob {
 
 /** AI 助手：SSE 流式对话 + 多会话 + 知识库来源 + 语音朗读（讯飞/浏览器降级） */
 export default function AIChatDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { message: antdMsg } = App.useApp()
+  const { message: antdMsg, modal } = App.useApp()
   const [sessions, setSessions] = useState<ChatSessionItem[]>([])
   const [activeSession, setActiveSession] = useState<string | null>(null)
   const [bubbles, setBubbles] = useState<Bubble[]>([])
@@ -114,6 +114,22 @@ export default function AIChatDrawer({ open, onClose }: { open: boolean; onClose
     await aiAPI.removeSession(sid)
     if (sid === activeSession) newSession()
     loadSessions()
+  }
+
+  const clearAllSessions = () => {
+    modal.confirm({
+      title: '清空全部历史会话？',
+      content: `共 ${sessions.length} 条会话及其消息，删除后不可恢复`,
+      okText: '全部删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        await aiAPI.clearSessions()
+        newSession()
+        loadSessions()
+        antdMsg.success('历史会话已清空')
+      },
+    })
   }
 
   const speak = async (text: string) => {
@@ -337,7 +353,11 @@ export default function AIChatDrawer({ open, onClose }: { open: boolean; onClose
   }
 
   const sessionMenu = {
-    items: sessions.map((s) => ({
+    items: [
+      { key: '__clear__', danger: true, icon: <DeleteOutlined />,
+        label: '清空全部', onClick: clearAllSessions },
+      { type: 'divider' as const },
+      ...sessions.map((s) => ({
       key: s.id,
       label: (
         <div style={{
@@ -361,6 +381,7 @@ export default function AIChatDrawer({ open, onClose }: { open: boolean; onClose
         </div>
       ),
     })),
+    ],
   }
 
   return (

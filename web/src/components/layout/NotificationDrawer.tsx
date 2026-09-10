@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { App, Badge, Button, Drawer, Empty, List, Tag, Typography } from 'antd'
-import { CheckOutlined } from '@ant-design/icons'
+import { App, Badge, Button, Drawer, Empty, List, Popconfirm, Space, Tag, Typography } from 'antd'
+import { CheckOutlined, ClearOutlined } from '@ant-design/icons'
 import { notificationAPI } from '@/api/modules'
 import { useAuthStore } from '@/store/auth'
 import type { NotificationItem } from '@/types'
@@ -52,6 +52,12 @@ export default function NotificationDrawer({ open, unread, onClose, onChanged }:
     load(page)
   }
 
+  const clearAll = async () => {
+    await notificationAPI.clear()
+    message.success('通知已清空')
+    load(1)
+  }
+
   const openItem = async (n: NotificationItem) => {
     if (!n.isRead) await markRead([n.id])
     if (n.linkKey && n.linkId) {
@@ -69,9 +75,22 @@ export default function NotificationDrawer({ open, unread, onClose, onChanged }:
       width={420}
       title={<Badge count={unread} offset={[8, -2]}>通知中心</Badge>}
       extra={
-        <Button size="small" icon={<CheckOutlined />} disabled={unread === 0} onClick={readAll}>
-          全部已读
-        </Button>
+        <Space size={4}>
+          <Button size="small" icon={<CheckOutlined />} disabled={unread === 0} onClick={readAll}>
+            全部已读
+          </Button>
+          <Popconfirm
+            title="确定清空所有通知？"
+            description="清空后不可恢复"
+            okText="清空"
+            okButtonProps={{ danger: true }}
+            onConfirm={clearAll}
+          >
+            <Button size="small" icon={<ClearOutlined />} disabled={total === 0} danger>
+              清空
+            </Button>
+          </Popconfirm>
+        </Space>
       }
       styles={{ body: { padding: '0 16px' } }}
     >

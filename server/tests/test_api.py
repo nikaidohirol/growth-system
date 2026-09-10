@@ -107,6 +107,9 @@ async def test_counsellor_audit_flow():
         back = (await c.post(f"/api/audit/submit/practice/{rid}",
                              json={"status": "驳回", "opinion": "演示清理"})).json()
         assert back["code"] == 0 and back["data"]["status"] == "驳回"  # 公示异议驳回
+    # 清理：驳回态学生可删除，避免测试数据残留开发库
+    async with client(stu) as c:
+        assert (await c.delete(f"/api/entities/practice/{rid}")).json()["code"] == 0
 
 
 async def test_dean_review_flow():
@@ -508,6 +511,27 @@ async def test_notification():
         await c.post("/api/notifications/read", json={"all": True})
     async with client(coun) as c:
         await c.post("/api/notifications/read", json={"all": True})
+
+
+async def test_notification_clear():
+    """清空通知：本人列表与未读数清零，仅作用本人不影响他人"""
+    stu, coun = await login("202300001"), await login("C0001")
+    # 学生被驳回 → 收到一条未读通知
+    async with client(stu) as c:
+        rid = (await c.post("/api/entities/inn_competition", json={
+            "project": "清空验证竞赛", "post": "第一完成人", "date": "2026-08-03",
+            "_kv_chiefly": "省级", "_kv_minor": "一等奖", "files": []})).json()["data"]["id"]
+    async with client(coun) as c:
+        assert (await c.post(f"/api/audit/submit/inn_competition/{rid}",
+                             json={"status": "驳回", "opinion": "清空测试"})).json()["code"] == 0
+    # 清空后列表/未读清零；他人通知不受影响
+    async with client(stu) as c:
+        assert (await c.get("/api/notifications/unread")).json()["data"]["unread"] >= 1
+        assert (await c.post("/api/notifications/clear")).json()["code"] == 0
+        box = (await c.get("/api/notifications")).json()["data"]
+        assert box["total"] == 0 and box["unread"] == 0 and box["list"] == []
+        # 清理：删除驳回状态的测试记录
+        assert (await c.delete(f"/api/entities/inn_competition/{rid}")).json()["code"] == 0
 
 
 async def test_publicity_objection_flow():

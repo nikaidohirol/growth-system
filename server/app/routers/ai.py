@@ -156,6 +156,19 @@ async def del_session(sid: str, user: User = Depends(get_current_user),
     return {"code": 0}
 
 
+@router.delete("/sessions")
+async def clear_sessions(user: User = Depends(get_current_user),
+                         db: AsyncSession = Depends(get_db)):
+    """清空当前用户全部历史会话（含消息）"""
+    sids = (await db.execute(select(ChatSession.id)
+                             .where(ChatSession.sid == user.id))).scalars().all()
+    if sids:
+        await db.execute(delete(ChatMessage).where(ChatMessage.sessionId.in_(sids)))
+        await db.execute(delete(ChatSession).where(ChatSession.sid == user.id))
+        await db.commit()
+    return {"code": 0, "data": {"cleared": len(sids)}}
+
+
 # ---------------- 表单智能填充 ----------------
 FORM_PROMPT = """你是学生成长系统的填表助手。根据用户的自然语言描述，为「{label}」申请表生成字段值。
 字段定义（JSON）：
