@@ -49,12 +49,12 @@ export default function OpLogPage() {
 
   const columns: ColumnsType<OperationLog> = [
     {
-      title: '时间', width: 170,
+      title: '时间', width: 170, fixed: 'left' as const,
       dataIndex: 'createdAt',
       render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text>,
     },
     {
-      title: '操作人', width: 150,
+      title: '操作人', width: 150, fixed: 'left' as const,
       render: (_, r) => (
         <>
           {r.operatorName}
@@ -86,7 +86,7 @@ export default function OpLogPage() {
   }
 
   return (
-    <Card>
+    <Card style={{ minWidth: 1080 }}>
       <Title level={4} style={{ marginTop: 0 }}>操作日志</Title>
       <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
         全量留痕、只增不删：记录每一笔申报、修改、删除、审核与登录，满足审计合规要求
@@ -116,7 +116,7 @@ export default function OpLogPage() {
       </div>
       <Table
         rowKey="id" loading={loading} columns={columns} dataSource={list}
-        pagination={{ current: page, pageSize, total, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+        pagination={{ current: page, pageSize, total, showSizeChanger: true, showQuickJumper: true, showTotal: (t) => `共 ${t} 条` }}
         onChange={onTableChange}
       />
     </Card>

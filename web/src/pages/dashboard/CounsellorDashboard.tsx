@@ -23,7 +23,7 @@ export default function CounsellorDashboard() {
   useEffect(load, [])
 
   const columns = useMemo(() => [
-    { title: '模块分组', dataIndex: 'group', width: 120,
+    { title: '模块分组', dataIndex: 'group', width: 120, fixed: 'left' as const,
       render: (g: string) => GROUP_LABEL[g] ?? g },
     { title: '审核模块', dataIndex: 'label' },
     { title: '待审核数量', dataIndex: 'count', width: 120, render: (n: number) => n },
@@ -36,7 +36,7 @@ export default function CounsellorDashboard() {
   return (
     <div>
       <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col span={12}>
+        <Col xs={24} md={12}>
           <Card>
             <Statistic
               title="待审核事项"
@@ -47,7 +47,7 @@ export default function CounsellorDashboard() {
             />
           </Card>
         </Col>
-        <Col span={12}>
+        <Col xs={24} md={12}>
           <Card>
             <Statistic
               title="累计已通过"
@@ -61,6 +61,7 @@ export default function CounsellorDashboard() {
       </Row>
       <Card
         title="待审核汇总"
+        style={{ minWidth: 560 }}
         extra={<Button size="small" icon={<RedoOutlined />} onClick={load}>刷新</Button>}
       >
         <Table

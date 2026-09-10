@@ -3,8 +3,10 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Avatar, Badge, Dropdown, Layout, Menu, theme } from 'antd'
 import type { MenuProps } from 'antd'
 import {
-  AuditOutlined, BellOutlined, DownOutlined, ExportOutlined, EyeOutlined, FileSearchOutlined,
-  IdcardOutlined, LogoutOutlined, RobotOutlined, SoundOutlined, TeamOutlined, TrophyOutlined, UserOutlined,
+  ApartmentOutlined, AuditOutlined, BarChartOutlined, BellOutlined, DashboardOutlined, DownOutlined,
+  ExportOutlined, EyeOutlined, FlagOutlined, HistoryOutlined, LogoutOutlined, OrderedListOutlined,
+  RobotOutlined, RocketOutlined, SafetyCertificateOutlined, SolutionOutlined, SoundOutlined,
+  TeamOutlined, TrophyOutlined, UserOutlined,
 } from '@ant-design/icons'
 import { notificationAPI } from '@/api/modules'
 import { useAuthStore } from '@/store/auth'
@@ -20,7 +22,7 @@ function useMenu(): MenuEntry[] {
   return useMemo(() => {
     if (user?.role === 'Student') {
       return [
-        { key: '/dashboard', icon: <TrophyOutlined />, label: '主面板' },
+        { key: '/dashboard', icon: <DashboardOutlined />, label: '主面板' },
         {
           key: 'practice', icon: <TeamOutlined />, label: '社会实践', children: [
             { key: '/entity/practice', label: '社会实践活动' },
@@ -28,7 +30,7 @@ function useMenu(): MenuEntry[] {
           ],
         },
         {
-          key: 'inn', icon: <TrophyOutlined />, label: '创新创业', children: [
+          key: 'inn', icon: <RocketOutlined />, label: '创新创业', children: [
             { key: '/entity/inn_chair', label: '前沿学术报告' },
             { key: '/entity/inn_project', label: '年度创新创业项目' },
             { key: '/entity/inn_competition', label: '科技创新竞赛' },
@@ -39,10 +41,10 @@ function useMenu(): MenuEntry[] {
           ],
         },
         { key: '/entity/honor', icon: <TrophyOutlined />, label: '个人荣誉' },
-        { key: '/entity/certificate', icon: <IdcardOutlined />, label: '技能证书' },
-        { key: '/entity/organization', icon: <TeamOutlined />, label: '组织经历' },
-        { key: '/entity/party', icon: <UserOutlined />, label: '入党情况' },
-        { key: '/grade', icon: <TrophyOutlined />, label: '综合素质成绩' },
+        { key: '/entity/certificate', icon: <SafetyCertificateOutlined />, label: '技能证书' },
+        { key: '/entity/organization', icon: <ApartmentOutlined />, label: '组织经历' },
+        { key: '/entity/party', icon: <FlagOutlined />, label: '入党情况' },
+        { key: '/grade', icon: <BarChartOutlined />, label: '综合素质成绩' },
         { key: '/export', icon: <ExportOutlined />, label: '成长档案' },
         { key: '/publicity', icon: <SoundOutlined />, label: '院级公示栏' },
         { key: '/info', icon: <UserOutlined />, label: '个人信息' },
@@ -50,21 +52,21 @@ function useMenu(): MenuEntry[] {
     }
     if (user?.role === 'Counsellor') {
       return [
-        { key: '/dashboard', icon: <AuditOutlined />, label: '主面板' },
+        { key: '/dashboard', icon: <DashboardOutlined />, label: '主面板' },
         { key: '/audit', icon: <AuditOutlined />, label: '审核中心' },
-        { key: '/comp-rank', icon: <TrophyOutlined />, label: '综测测算排名' },
+        { key: '/comp-rank', icon: <OrderedListOutlined />, label: '综测测算排名' },
         { key: '/publicity', icon: <SoundOutlined />, label: '院级公示栏' },
-        { key: '/students', icon: <TeamOutlined />, label: '学生管理' },
-        { key: '/logs', icon: <FileSearchOutlined />, label: '操作日志' },
+        { key: '/students', icon: <SolutionOutlined />, label: '学生管理' },
+        { key: '/logs', icon: <HistoryOutlined />, label: '操作日志' },
         { key: '/info', icon: <UserOutlined />, label: '个人信息' },
       ]
     }
     return [
-      { key: '/dashboard', icon: <AuditOutlined />, label: '主面板' },
+      { key: '/dashboard', icon: <DashboardOutlined />, label: '主面板' },
       { key: '/audit', icon: <AuditOutlined />, label: '审核中心' },
-      { key: '/comp-rank', icon: <TrophyOutlined />, label: '综测测算排名' },
+      { key: '/comp-rank', icon: <OrderedListOutlined />, label: '综测测算排名' },
       { key: '/publicity', icon: <EyeOutlined />, label: '公示异议复核' },
-      { key: '/logs', icon: <FileSearchOutlined />, label: '操作日志' },
+      { key: '/logs', icon: <HistoryOutlined />, label: '操作日志' },
       { key: '/info', icon: <UserOutlined />, label: '个人信息' },
     ]
   }, [user?.role])
@@ -99,8 +101,14 @@ export default function MainLayout() {
 
   const activeLabel = useMemo(() => {
     for (const m of menu) {
-      if (m && 'key' in m && m.key === location.pathname) {
-        return 'label' in m ? m.label : undefined
+      if (!m || !('key' in m)) continue
+      if (m.key === location.pathname) return 'label' in m ? m.label : undefined
+      if ('children' in m && Array.isArray(m.children)) {
+        for (const sub of m.children) {
+          if (sub && 'key' in sub && sub.key === location.pathname) {
+            return 'label' in sub ? sub.label : undefined
+          }
+        }
       }
     }
     return undefined
@@ -110,20 +118,35 @@ export default function MainLayout() {
 
   return (
     <Layout style={{ height: '100vh' }}>
-      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="dark">
-        <div style={{
-          height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontWeight: 700, fontSize: collapsed ? 14 : 16, letterSpacing: 1,
-        }}>
-          {collapsed ? 'GS' : 'AI 学生成长发展系统'}
+      {/* lg 断点：窗口 <992px（平板竖屏/手机）自动折叠为 80px 图标栏 */}
+      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="dark" breakpoint="lg">
+        {/* 展开名与缩写叠放交叉淡入淡出，过渡时长对齐 Sider 宽度动画，避免文字瞬切突兀 */}
+        <div style={{ height: 56, position: 'relative', overflow: 'hidden', color: '#fff' }}>
+          <span style={{
+            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontWeight: 700, fontSize: 16, letterSpacing: 1, whiteSpace: 'nowrap',
+            opacity: collapsed ? 0 : 1, transition: 'opacity 0.25s ease',
+          }}>
+            AI 学生成长发展系统
+          </span>
+          <span style={{
+            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontWeight: 700, fontSize: 14, letterSpacing: 2, whiteSpace: 'nowrap',
+            opacity: collapsed ? 1 : 0, transition: 'opacity 0.25s ease',
+          }}>
+            GS
+          </span>
         </div>
-        <Menu
-          theme="dark" mode="inline" selectedKeys={[location.pathname]}
-          items={menu}
-          onClick={({ key }) => {
-            if (String(key).startsWith('/')) navigate(String(key))
-          }}
-        />
+        {/* 菜单超高时在侧栏内滚动（滚动条隐藏，滚轮可用），避免撑出 body 第二根滚动条 */}
+        <div className="sider-menu-scroll" style={{ height: 'calc(100% - 56px - 48px)', overflowY: 'auto', overflowX: 'hidden' }}>
+          <Menu
+            theme="dark" mode="inline" selectedKeys={[location.pathname]}
+            items={menu}
+            onClick={({ key }) => {
+              if (String(key).startsWith('/')) navigate(String(key))
+            }}
+          />
+        </div>
       </Sider>
       <Layout>
         <Header style={{
@@ -131,7 +154,10 @@ export default function MainLayout() {
           alignItems: 'center', justifyContent: 'space-between',
           boxShadow: '0 1px 4px rgba(0,21,41,.08)',
         }}>
-          <span style={{ fontSize: 15, color: token.colorTextSecondary }}>
+          <span style={{
+            fontSize: 15, color: token.colorTextSecondary,
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0,
+          }}>
             {activeLabel ?? location.pathname.replace('/entity/', '').replace('/', '')}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -164,7 +190,7 @@ export default function MainLayout() {
                 },
               }}
             >
-              <span style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
                 <Avatar size={30} icon={<UserOutlined />} src={user?.photo} />
                 <span>
                   {user?.name}

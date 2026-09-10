@@ -175,13 +175,14 @@ export default function EntityPage() {
   const columns = useMemo(() => {
     if (!entity) return []
     const cols: {
-      title: string; dataIndex?: string; key: string; ellipsis?: boolean
-      width?: number; render?: (v: unknown) => ReactNode
-    }[] = entity.fields.filter((f) => f.inTable).map((f) => ({
+      title: string; dataIndex?: string; key: string
+      width?: number; fixed?: 'left'; render?: (v: unknown) => ReactNode
+    }[] = entity.fields.filter((f) => f.inTable).map((f, i) => ({
       title: f.label,
       dataIndex: f.name,
       key: f.name,
-      ellipsis: true,
+      // 首列为身份列（名称/主题等）：小屏横向滚动时保持可见（与审核中心一致）
+      fixed: i === 0 ? ('left' as const) : undefined,
       render: (v: unknown) => renderCell(f, v),
     }))
     cols.push({
@@ -196,6 +197,7 @@ export default function EntityPage() {
   return (
     <Card
       title={entity.label}
+      style={{ minWidth: 1040 }}
       extra={
         <Space>
           <Input
@@ -225,7 +227,7 @@ export default function EntityPage() {
         columns={[
           ...columns,
           {
-            title: '操作', key: 'action', width: 170, fixed: 'right',
+            title: '操作', key: 'action', width: 250,
             render: (_, r: EntityRecord) => (
               <Space size={0}>
                 <Button type="link" size="small" icon={<EyeOutlined />}
@@ -248,7 +250,7 @@ export default function EntityPage() {
         ]}
         dataSource={rows}
         pagination={{
-          current: page, pageSize, total, showSizeChanger: true, showTotal: (t) => `共 ${t} 条`,
+          current: page, pageSize, total, showSizeChanger: true, showQuickJumper: true, showTotal: (t) => `共 ${t} 条`,
           onChange: (p, ps) => {
             setPage(p)
             setPageSize(ps)

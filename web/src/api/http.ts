@@ -29,6 +29,7 @@ http.interceptors.response.use(
     if (status === 401) {
       localStorage.removeItem('gs_token')
       localStorage.removeItem('gs_user')
+      // 登录页自身的 401 = 账号或密码错误，由登录页内联 Alert 常驻展示；其余页面的 401 = 登录过期
       if (!location.pathname.startsWith('/login')) {
         message.warning('登录已过期，请重新登录')
         location.href = '/login'

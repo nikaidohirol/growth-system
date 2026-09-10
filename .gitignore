@@ -33,3 +33,10 @@ Thumbs.db
 
 # locust 缓存产物
 server/benchmarks/__pycache__/
+server/benchmarks/*_history.csv
+
+# tsc 编译产物（e2e 源码为 .ts，编译出的 .js/.d.ts 不入库）
+web/e2e/*.js
+web/e2e/*.d.ts
+web/playwright.config.js
+web/playwright.config.d.ts

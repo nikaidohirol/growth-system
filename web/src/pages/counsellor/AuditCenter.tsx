@@ -76,7 +76,7 @@ export default function AuditCenter() {
 
   useEffect(() => {
     if (loaded && entity) loadRows()
-  }, [loaded, entity, page, pageSize]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loaded, entity, loadRows])
 
   // 通知深链：/audit?key=xxx&rid=yyy → 自动打开对应记录详情弹窗
   const rid = params.get('rid')
@@ -143,12 +143,12 @@ export default function AuditCenter() {
       { title: '学生', key: 'stu', width: 150, fixed: 'left' as const,
         render: (_: unknown, r: AuditRow) => (
           <div>
-            <div>{r.student.name} <Tag style={{ marginLeft: 4 }}>{r.student.uid}</Tag></div>
-            <span style={{ color: '#999', fontSize: 12 }}>{r.student.classId} {r.student.college}</span>
+            <div>{r.student.name} <span style={{ color: '#999', fontSize: 12, marginLeft: 4 }}>{r.student.uid}</span></div>
+            <div style={{ color: '#999', fontSize: 12 }}>{r.student.classId} {r.student.college}</div>
           </div>
         ) },
       ...entity.fields.filter((f) => f.inTable).map((f) => ({
-        title: f.label, dataIndex: f.name, key: f.name, ellipsis: true,
+        title: f.label, dataIndex: f.name, key: f.name,
         render: (v: unknown) => (v ? String(v).replace('·', ' / ') : '-'),
       })),
       { title: '材料', dataIndex: 'files', width: 90,
@@ -159,7 +159,7 @@ export default function AuditCenter() {
           : <Tag>无</Tag>) },
       { title: '状态', dataIndex: 'status', width: 96,
         render: (s: string) => <Tag color={STATUS_COLOR[s]}>{s}</Tag> },
-      { title: '操作', key: 'op', width: isDean ? 250 : 210, fixed: 'right' as const,
+      { title: '操作', key: 'op', width: 285,
         render: (_: unknown, r: AuditRow) => (
           <Space size={0}>
             <Button type="link" size="small" onClick={() => { setDetail(r); setAiTip(null) }}>详情</Button>
@@ -219,6 +219,7 @@ export default function AuditCenter() {
   return (
     <Card
       title="审核中心"
+      style={{ minWidth: 1190 }}
       extra={
         <Space>
           <Segmented
@@ -240,7 +241,7 @@ export default function AuditCenter() {
                   onChange={(s) => { setStatus(s); setPage(1) }} />
           <Input.Search
             placeholder="学生姓名 / 学号" allowClear style={{ width: 180 }}
-            onSearch={(kw) => { setKeyword(kw); setPage(1); loadRows(1, pageSize) }}
+            onSearch={(kw) => { setKeyword(kw); setPage(1) }}
           />
           <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>Excel 导入</Button>
           <Button icon={<RedoOutlined />} onClick={() => loadRows()} />
@@ -264,13 +265,12 @@ export default function AuditCenter() {
         loading={loading}
         columns={columns as never}
         dataSource={rows}
-        scroll={{ x: 1100 }}
         rowSelection={isDean && status === '待院长审批' ? {
           selectedRowKeys: selected,
           onChange: (keys) => setSelected(keys as string[]),
         } : undefined}
         pagination={{
-          current: page, pageSize, total, showSizeChanger: true,
+          current: page, pageSize, total, showSizeChanger: true, showQuickJumper: true,
           showTotal: (t) => `共 ${t} 条`,
           onChange: (p, ps) => { setPage(p); setPageSize(ps); loadRows(p, ps) },
         }}

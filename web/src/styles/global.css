@@ -5,11 +5,24 @@ html, body, #root { height: 100%; margin: 0; }
 body {
   font-family: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   background: #f5f7fb;
+  /* 主框架固定 100vh，滚动统一发生在 Content/Sider 内部，杜绝 body 双滚动条与底部空白 */
+  overflow: hidden;
+}
+
+/* 侧边栏菜单滚动容器：隐藏滚动条，保留滚轮/触摸板滚动 */
+.sider-menu-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.sider-menu-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 /* ---- 登录页 ---- */
 .login-page {
   min-height: 100vh;
+  overflow: auto;
   display: grid;
   place-items: center;
   background:
@@ -35,6 +48,21 @@ body {
 }
 .login-title { text-align: center; font-size: 22px; font-weight: 700; color: #1e3c82; margin-bottom: 4px; }
 .login-sub { text-align: center; color: #8a94a6; margin-bottom: 24px; font-size: 13px; }
+
+/* ---- 个人信息页 ---- */
+/* 头像卡操作按钮网格：自适应列数，挤不下自动竖排，永不溢出卡片 */
+.info-actions {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+/* Upload 内部 .ant-upload-select 默认 inline-block 缩裹，导致按钮无法撑满网格轨道 */
+.info-actions .ant-upload-select,
+.info-actions .ant-upload-select .ant-upload {
+  display: block;
+  width: 100%;
+}
 
 /* ---- A4 成长档案 ---- */
 .a4 {

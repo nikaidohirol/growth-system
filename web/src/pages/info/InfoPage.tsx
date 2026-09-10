@@ -57,8 +57,9 @@ export default function InfoPage() {
   }
 
   return (
-    <Row gutter={16}>
-      <Col span={7}>
+    <Row gutter={[16, 16]}>
+      {/* lg(992px) 以下改为上下堆叠，与侧边栏收起断点一致；按钮网格自适应，挤不下自动竖排 */}
+      <Col xs={24} lg={7}>
         <Card style={{ textAlign: 'center' }}>
           <Avatar size={110} icon={<UserOutlined />} src={user.photo} style={{ marginBottom: 12 }} />
           <div style={{ fontSize: 17, fontWeight: 600 }}>{user.name}</div>
@@ -66,7 +67,7 @@ export default function InfoPage() {
           {user.role === 'Student' && user.counsellorName && (
             <div style={{ color: '#999', fontSize: 12, marginTop: 4 }}>辅导员：{user.counsellorName}</div>
           )}
-          <div style={{ marginTop: 16, display: 'grid', gap: 8 }}>
+          <div className="info-actions">
             <Upload
               accept=".jpg,.jpeg,.png" showUploadList={false}
               customRequest={({ file }) => uploadPhoto(file as File)}
@@ -77,10 +78,11 @@ export default function InfoPage() {
           </div>
         </Card>
       </Col>
-      <Col span={17}>
+      <Col xs={24} lg={17}>
         <Card title="基本信息" extra={<Button type="primary" loading={saving} onClick={save}>保存</Button>}>
           <Form form={form} layout="vertical">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', columnGap: 16 }}>
+            {/* 自适应列数：宽屏 3 列，窄屏自动降为 1 列 */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', columnGap: 16 }}>
               <Form.Item name="name" label="姓名" rules={[{ required: true }]}><Input /></Form.Item>
               {user.role === 'Student' && (
                 <>

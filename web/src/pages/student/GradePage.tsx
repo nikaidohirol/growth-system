@@ -49,7 +49,7 @@ const DIM_COLOR: Record<string, string> = {
 interface TraceRow { dim: string; item: CompBonusItem | null; note: string }
 
 const traceColumns: TableColumnsType<TraceRow> = [
-  { title: '维度', dataIndex: 'dim', width: 110,
+  { title: '维度', dataIndex: 'dim', width: 110, fixed: 'left' as const,
     render: (dim: string) => <Tag color={DIM_COLOR[dim]}>{dim}</Tag> },
   { title: '来源明细（点击追溯）', key: 'item',
     render: (_, r) => r.item
@@ -71,7 +71,7 @@ export default function GradePage() {
   const trend = useMemo<EChartsOption>(() => ({
     tooltip: { trigger: 'axis' },
     legend: { bottom: 0 },
-    grid: { left: 50, right: 24, bottom: 50 },
+    grid: { left: 50, right: 44, bottom: 50 },
     xAxis: { type: 'category' as const, data: rows.map((r) => r.semester) },
     yAxis: [{ type: 'value' as const, name: 'GPA', min: (v: { min: number }) => Math.floor(v.min - 0.2) },
             { type: 'value' as const, name: '分数', max: 100 }],
@@ -85,7 +85,9 @@ export default function GradePage() {
     tooltip: { trigger: 'axis' },
     grid: { left: 50, right: 24, bottom: 50 },
     xAxis: { type: 'category' as const, data: rows.map((r) => r.semester) },
-    yAxis: { type: 'value' as const, name: '名次（小更好）', inverse: true },
+    yAxis: { type: 'value' as const, name: '名次（小更好）', inverse: true,
+             nameLocation: 'start' as const, nameGap: 14,
+             nameTextStyle: { align: 'left' as const } },
     series: [
       { name: 'GPA 排名', type: 'bar', barMaxWidth: 26, data: rows.map((r) => r.gpaRank) },
       { name: '综测排名', type: 'bar', barMaxWidth: 26, data: rows.map((r) => r.compRank) },
@@ -102,12 +104,12 @@ export default function GradePage() {
   return (
     <>
       <Row gutter={16}>
-        <Col span={10}>
-          <Card title="各学期成绩" size="small">
+        <Col xs={24} md={10}>
+          <Card title="各学期成绩" size="small" style={{ minWidth: 430 }}>
             <Table
               rowKey="id" size="small" pagination={false} dataSource={rows}
               columns={[
-                { title: '学期', dataIndex: 'semester' },
+                { title: '学期', dataIndex: 'semester', fixed: 'left' as const },
                 { title: 'GPA', dataIndex: 'gpa' },
                 { title: '综测', dataIndex: 'comp' },
                 { title: '排名', key: 'rank',
@@ -116,7 +118,8 @@ export default function GradePage() {
             />
           </Card>
         </Col>
-        <Col span={14}>
+        {/* 成绩趋势/专业排名属次要图表：小屏隐藏（xs=0），只留各学期成绩与综测测算 */}
+        <Col xs={0} md={14}>
           <Card title="成绩趋势" size="small" style={{ marginBottom: 16 }}>
             <EChart option={trend} height={240} />
           </Card>
@@ -126,25 +129,25 @@ export default function GradePage() {
         </Col>
       </Row>
       <Card
-        size="small" style={{ marginTop: 16 }}
+        size="small" style={{ marginTop: 16, minWidth: 560 }}
         title="综测过程分测算（系统实时 · 仅统计已生效记录）"
         extra={<Tooltip title={ruleText}><Text type="secondary">测算口径</Text></Tooltip>}
       >
         {fc ? (
           <>
             <Row gutter={16} style={{ marginBottom: 12 }}>
-              <Col span={5}>
+              <Col xs={12} md={5}>
                 <StatisticLike label="测算总分" value={fc.total} strong />
               </Col>
-              <Col span={5}>
+              <Col xs={12} md={5}>
                 <StatisticLike label="专业内排名"
                   value={fc.majorSize ? `${fc.majorRank} / ${fc.majorSize}` : '—'}
                   note="按同年级同专业完整名单测算" />
               </Col>
-              <Col span={4}><StatisticLike label="学业" value={fc.academic.score} /></Col>
-              <Col span={4}><StatisticLike label="德育" value={fc.moral.score} /></Col>
-              <Col span={3}><StatisticLike label="文体" value={fc.sports.score} /></Col>
-              <Col span={3}>
+              <Col xs={12} md={4}><StatisticLike label="学业" value={fc.academic.score} /></Col>
+              <Col xs={12} md={4}><StatisticLike label="德育" value={fc.moral.score} /></Col>
+              <Col xs={12} md={3}><StatisticLike label="文体" value={fc.sports.score} /></Col>
+              <Col xs={12} md={3}>
                 <StatisticLike label="创新加分" value={`+${fc.innovation.bonus}`}
                   note={fc.imported ? `教务综测 ${fc.imported.comp}（第 ${fc.imported.compRank}/${fc.imported.maxRank}）` : undefined} />
               </Col>

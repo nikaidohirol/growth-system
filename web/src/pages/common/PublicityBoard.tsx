@@ -71,7 +71,7 @@ export default function PublicityBoard() {
   }
 
   const pubCols = [
-    { title: '学生', key: 'stu', render: (_: unknown, r: PublicityRow) => (
+    { title: '学生', key: 'stu', width: 150, fixed: 'left' as const, render: (_: unknown, r: PublicityRow) => (
       <span>{r.student.name}<span style={{ color: '#999', fontSize: 12, marginLeft: 6 }}>{r.student.classId}</span></span>
     ) },
     { title: '类别', dataIndex: 'label', key: 'label', width: 120 },
@@ -92,19 +92,21 @@ export default function PublicityBoard() {
   ]
 
   const objCols = (withOwner: boolean, withOp: boolean) => [
-    ...(withOwner ? [{ title: '被异议学生', key: 'owner', width: 150,
+    ...(withOwner ? [{ title: '被异议学生', key: 'owner', width: 150, fixed: 'left' as const,
       render: (_: unknown, o: ObjectionItem) => o.owner ? (
         <span>{o.owner.name}<span style={{ color: '#999', fontSize: 12, marginLeft: 6 }}>{o.owner.classId}</span></span>
       ) : '-' }] : []),
-    { title: '异议人', key: 'objector', width: 130,
-      render: (_: unknown, o: ObjectionItem) => `${o.objector.name}（${o.objector.uid}）` },
+    { title: '异议人', key: 'objector', width: 150, fixed: 'left' as const,
+      render: (_: unknown, o: ObjectionItem) => (
+        <span>{o.objector.name}<span style={{ color: '#999', fontSize: 12, marginLeft: 6 }}>{o.objector.uid}</span></span>
+      ) },
     { title: '认定对象', key: 'target', render: (_: unknown, o: ObjectionItem) => (
       <span>{o.label}：<Typography.Text strong>{o.title}</Typography.Text></span>
     ) },
-    { title: '异议理由', dataIndex: 'reason', key: 'reason', ellipsis: true },
+    { title: '异议理由', dataIndex: 'reason', key: 'reason' },
     { title: '提交时间', dataIndex: 'createdAt', key: 'createdAt', width: 165,
       render: (v: string) => v?.slice(0, 16) },
-    { title: '状态', key: 'status', width: withOp ? 190 : 150,
+    { title: '状态', key: 'status', width: withOp ? 140 : 150,
       render: (_: unknown, o: ObjectionItem) => (
         <Space size={4} wrap>
           <Tag color={OBJ_COLOR[o.status]}>{o.status}</Tag>
@@ -115,7 +117,7 @@ export default function PublicityBoard() {
           )}
         </Space>
       ) },
-    ...(withOp ? [{ title: '操作', key: 'op', width: 190, fixed: 'right' as const,
+    ...(withOp ? [{ title: '操作', key: 'op', width: 240,
       render: (_: unknown, o: ObjectionItem) => o.status === '待复核' ? (
         <Space size={0}>
           <Button type="link" size="small" danger icon={<CloseOutlined />}
@@ -134,7 +136,7 @@ export default function PublicityBoard() {
     <div>
       {isDean && (
         <Card size="small" title={<span><EyeOutlined /> 异议复核</span>}
-              style={{ marginBottom: 16 }}
+              style={{ marginBottom: 16, minWidth: 1130 }}
               extra={
                 <Radio.Group value={objStatus} onChange={(e) => setObjStatus(e.target.value)} size="small">
                   <Radio.Button value="待复核">待复核</Radio.Button>
@@ -147,18 +149,19 @@ export default function PublicityBoard() {
         </Card>
       )}
 
-      <Card size="small" title={<span><SoundOutlined /> 院级公示栏（公示期 {rows.length} 条）</span>}>
+      <Card size="small" title={<span><SoundOutlined /> 院级公示栏（公示期 {rows.length} 条）</span>}
+            style={{ minWidth: 890 }}>
         <Typography.Paragraph type="secondary" style={{ marginBottom: 12, fontSize: 13 }}>
           公示期 7 天：认定结果公示接受全院师生监督，可对存疑记录实名提出异议（学院复核后反馈）；
           公示期满且无未复核异议的记录自动生效。
         </Typography.Paragraph>
         <Table rowKey={(r) => `${r.key}-${r.recordId}`} size="small" loading={loading}
                columns={pubCols} dataSource={rows} pagination={false}
-               scroll={{ x: 860 }} locale={{ emptyText: <Empty description="当前没有公示中的记录" /> }} />
+               locale={{ emptyText: <Empty description="当前没有公示中的记录" /> }} />
       </Card>
 
       {!isDean && mine.length > 0 && (
-        <Card size="small" title={`我提出的异议（${mine.length}）`} style={{ marginTop: 16 }}>
+        <Card size="small" title={`我提出的异议（${mine.length}）`} style={{ marginTop: 16, minWidth: 940 }}>
           <Table rowKey="id" size="small" columns={objCols(false, false)} dataSource={mine} pagination={false} />
         </Card>
       )}

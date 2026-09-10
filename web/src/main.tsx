@@ -20,6 +20,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           borderRadius: 8,
           fontSize: 14,
         },
+        components: {
+          // antd 暗色菜单弹层选中项默认 #1668dc（偏蓝），统一为主色
+          Menu: { darkItemSelectedBg: '#3b6fe0' },
+        },
       }}
     >
       <AntdApp>

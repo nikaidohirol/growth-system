@@ -122,18 +122,18 @@ export default function StudentManage() {
   }
 
   const columns = useMemo(() => [
-    { title: '学号', dataIndex: 'uid', width: 100 },
-    { title: '姓名', dataIndex: 'name', width: 90 },
+    { title: '学号', dataIndex: 'uid', width: 100, fixed: 'left' as const },
+    { title: '姓名', dataIndex: 'name', width: 90, fixed: 'left' as const },
     { title: '性别', dataIndex: 'sex', width: 60 },
     { title: '班级', dataIndex: 'classId', width: 110 },
     { title: '年级', dataIndex: 'periods', width: 90 },
-    { title: '学院', dataIndex: 'college', ellipsis: true },
-    { title: '专业', dataIndex: 'major', ellipsis: true },
+    { title: '学院', dataIndex: 'college', width: 170, ellipsis: true },
+    { title: '专业', dataIndex: 'major', width: 140, ellipsis: true },
     { title: '双创学分', dataIndex: 'innCredit', width: 90 },
     { title: '实践学分', dataIndex: 'praCredit', width: 90 },
     { title: '总学分', dataIndex: 'sumCredit', width: 80,
       render: (v: number) => <Tag color={v >= 6 ? 'green' : 'orange'}>{v}</Tag> },
-    { title: '操作', key: 'op', width: 150,
+    { title: '操作', key: 'op', width: 215,
       render: (_: unknown, r: StudentRow) => (
         <Space size={0}>
           <Button type="link" size="small" icon={<FormOutlined />}
@@ -141,7 +141,7 @@ export default function StudentManage() {
             成绩
           </Button>
           <Button type="link" size="small" icon={<EditOutlined />}
-                  onClick={() => { setEditing(r); form.setFieldsValue(r) }}>
+                  onClick={() => { setEditing(r); form.resetFields(); form.setFieldsValue(r); setAddOpen(true) }}>
             编辑
           </Button>
           <Popconfirm title="删除学生及其全部记录？" onConfirm={() => removeStudent(r.id)}>
@@ -197,6 +197,7 @@ export default function StudentManage() {
   return (
     <Card
       title="学生管理"
+      style={{ minWidth: 1240 }}
       extra={
         <Space>
           <Select allowClear placeholder="年级" style={{ width: 110 }}
@@ -219,7 +220,7 @@ export default function StudentManage() {
         rowKey="id" loading={loading} size="small"
         columns={columns as never} dataSource={rows}
         pagination={{
-          current: page, pageSize, total, showSizeChanger: true,
+          current: page, pageSize, total, showSizeChanger: true, showQuickJumper: true,
           showTotal: (t) => `共 ${t} 名学生`,
           onChange: (p, ps) => { setPage(p); setPageSize(ps); loadRows(p, ps) },
         }}

@@ -78,7 +78,7 @@ export default function DeanDashboard() {
           { title: '公示中', value: data.publicTotal, icon: <EyeOutlined />, color: '#1677ff' },
           { title: '累计认定通过', value: data.approvedTotal, icon: <CheckCircleOutlined />, color: '#3f8600' },
         ].map((s) => (
-          <Col span={4} key={s.title}>
+          <Col xs={12} md={4} key={s.title}>
             <Card>
               <Statistic title={s.title} value={s.value} prefix={s.icon}
                          valueStyle={{ color: s.color }} />
@@ -87,13 +87,13 @@ export default function DeanDashboard() {
         ))}
       </Row>
       <Row gutter={16}>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Card title="院系学生年级分布" size="small"><EChart option={gradeBar} height={280} /></Card>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Card title="双创学分分布（按类别）" size="small"><EChart option={innBar} height={280} /></Card>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Card title="院系平均 GPA 趋势" size="small"><EChart option={gpaLine} height={280} /></Card>
         </Col>
       </Row>
