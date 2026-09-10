@@ -90,9 +90,12 @@ export default async function globalSetup() {
   })
   await waitHealthy(`http://127.0.0.1:${BACKEND_PORT}/api/health`, '后端')
 
-  // 前端 preview（dist 须已构建，npm run e2e 先跑 build），代理指向独立后端
+  // 前端 preview（dist 须已构建，npm run e2e 先跑 build），代理指向独立后端。
+  // 显式绑 127.0.0.1：Linux runner 上 vite 默认 'localhost' 可能只解析/监听 ::1，
+  // 而 waitHealthy 与 playwright baseURL 均走 127.0.0.1（CI 曾因此 240s 超时挂死）。
   frontend = spawn(process.execPath,
-    ['node_modules/vite/bin/vite.js', 'preview', '--port', String(FRONTEND_PORT), '--strictPort'], {
+    ['node_modules/vite/bin/vite.js', 'preview', '--host', '127.0.0.1',
+      '--port', String(FRONTEND_PORT), '--strictPort'], {
       cwd: path.resolve(HERE, '..'),
       env: { ...process.env, VITE_API_TARGET: `http://127.0.0.1:${BACKEND_PORT}` },
       stdio: 'inherit',

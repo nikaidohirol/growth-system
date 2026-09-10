@@ -15,7 +15,7 @@ export default defineConfig({
   globalSetup: './e2e/global-setup.ts',
   globalTeardown: './e2e/global-teardown.ts',
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: 'http://127.0.0.1:4173', // 与 global-setup 的 preview 绑定一致，避免 localhost 解析歧义
     trace: 'retain-on-failure',
     locale: 'zh-CN',
   },
